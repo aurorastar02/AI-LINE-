@@ -1,24 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  Sparkles, 
-  Settings, 
-  Grid, 
-  Image as ImageIcon, 
-  Download, 
-  Trash2, 
-  Plus, 
-  CheckCircle2, 
-  RefreshCw,
-  Loader2,
-  ChevronRight,
-  Info
+  Sparkles, Settings, Grid, Image as ImageIcon, Download, 
+  Plus, CheckCircle2, RefreshCw, Loader2, ChevronRight, 
+  Info, MessageCircle, X, Smartphone, Palette, Wand2
 } from 'lucide-react';
-import { CharacterConfig, StickerPrompt } from './types';
-import { generateStickerPrompts, generateStickerImage } from './services/geminiService';
-import { processStickerImage } from './utils/imageUtils';
-
-const DEFAULT_KEYWORDS = ["你好", "謝謝", "對不起", "驚訝", "生氣", "疲累", "加油", "睡覺"];
+import { CharacterConfig, StickerPrompt, LinePack } from './types';
+import { generateScenarios, generateStickerImage } from './services/geminiService';
+import { processStickerImage, createLineSpecialImage } from './utils/imageUtils';
 
 export default function App() {
   const [step, setStep] = useState(1);
@@ -29,20 +18,21 @@ export default function App() {
     style: 'Q版比例 (Chibi)，粗輪廓線，平塗色塊 (Flat Illustration)'
   });
   
-  const [keywordsInput, setKeywordsInput] = useState(DEFAULT_KEYWORDS.join(', '));
   const [prompts, setPrompts] = useState<StickerPrompt[]>([]);
+  const [linePack, setLinePack] = useState<Partial<LinePack>>({});
   const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [showChatPreview, setShowChatPreview] = useState(false);
+  const [chatMessages, setChatMessages] = useState<string[]>([]);
 
-  const handleStartPlanning = async () => {
+  const handleAutoGenerateScenarios = async () => {
     setIsGeneratingPrompts(true);
     try {
-      const keywords = keywordsInput.split(',').map(k => k.trim()).filter(k => k);
-      const result = await generateStickerPrompts(character, keywords);
+      const result = await generateScenarios(character, 16);
       setPrompts(result);
       setStep(2);
     } catch (error) {
-      alert("生成策略時發生錯誤，請檢查您的 API Key 設定。");
+      alert("自動生成情境失敗，請檢查 API Key。");
     } finally {
       setIsGeneratingPrompts(false);
     }
@@ -54,9 +44,14 @@ export default function App() {
       const promptObj = prompts.find(p => p.id === id);
       if (!promptObj) return;
 
-      const rawImage = await generateStickerImage(promptObj.visualDescription);
+      const rawImage = await generateStickerImage(promptObj.visualDescription, character.referenceImage);
       const processedImage = await processStickerImage(rawImage);
       
+      // If this is the first one, set it as reference image for consistency
+      if (!character.referenceImage) {
+        setCharacter(prev => ({ ...prev, referenceImage: processedImage }));
+      }
+
       setPrompts(prev => prev.map(p => 
         p.id === id ? { 
           ...p, 
@@ -80,15 +75,26 @@ export default function App() {
     setIsGeneratingImages(false);
   };
 
+  const generateLineAssets = async () => {
+    const doneOnes = prompts.filter(p => p.status === 'done' && p.processedImage);
+    if (doneOnes.length === 0) return;
+    
+    const mainImg = await createLineSpecialImage(doneOnes[0].processedImage!, 240, 240);
+    const tabImg = await createLineSpecialImage(doneOnes[0].processedImage!, 96, 74);
+    
+    setLinePack({ main: mainImg, tab: tabImg });
+    alert("LINE 封面圖與標籤小圖已生成！");
+  };
+
   const downloadImage = (dataUrl: string, name: string) => {
     const link = document.createElement('a');
     link.href = dataUrl;
-    link.download = `貼圖_${name}.png`;
+    link.download = `${name}.png`;
     link.click();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -96,23 +102,17 @@ export default function App() {
             <div className="bg-indigo-600 p-2 rounded-lg">
               <Sparkles className="text-white w-5 h-5" />
             </div>
-            <h1 className="font-bold text-xl tracking-tight">AI LINE 貼圖工廠</h1>
+            <h1 className="font-bold text-xl tracking-tight hidden sm:block">AI Sticker Factory</h1>
+            <h1 className="font-bold text-xl tracking-tight sm:hidden">貼圖工廠</h1>
           </div>
-          <div className="flex items-center gap-4">
-             <div className="hidden md:flex gap-4">
-                {[
-                  { n: 1, l: '角色設定' },
-                  { n: 2, l: '貼圖生成' }
-                ].map((s) => (
-                  <div key={s.n} className={`flex items-center gap-2 ${step === s.n ? 'text-indigo-600 font-semibold' : 'text-gray-400'}`}>
-                    <span className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs ${step === s.n ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>
-                      {s.n}
-                    </span>
-                    {s.l}
-                    {s.n === 1 && <ChevronRight className="w-4 h-4 text-gray-300" />}
-                  </div>
-                ))}
-             </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setShowChatPreview(!showChatPreview)}
+              className={`p-2 rounded-lg transition-colors ${showChatPreview ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-600'}`}
+              title="對話預覽"
+            >
+              <MessageCircle className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -120,116 +120,109 @@ export default function App() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         {step === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
-            {/* Character Design Form */}
             <div className="lg:col-span-2 space-y-6">
-              <section className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-6">
-                  <Settings className="text-indigo-600 w-5 h-5" />
-                  <h2 className="text-lg font-bold">1. 定義您的角色</h2>
+              <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="bg-indigo-50 p-2 rounded-xl">
+                    <Palette className="text-indigo-600 w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-bold">1. 角色一致性設定</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">物種</label>
+                    <label className="text-sm font-semibold text-gray-700">物種與名字</label>
                     <input 
                       type="text" 
                       value={character.species}
                       onChange={(e) => setCharacter({...character, species: e.target.value})}
-                      placeholder="例如：柴犬、企鵝"
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-gray-50"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">藝術風格</label>
+                    <label className="text-sm font-semibold text-gray-700">藝術風格</label>
                     <input 
                       type="text" 
                       value={character.style}
                       onChange={(e) => setCharacter({...character, style: e.target.value})}
-                      placeholder="例如：水彩風、像素藝術"
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-gray-50"
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">核心外型特徵</label>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">外型細節</label>
                     <textarea 
                       value={character.features}
                       onChange={(e) => setCharacter({...character, features: e.target.value})}
                       rows={2}
-                      placeholder="獨特的身體特徵、眼睛形狀等..."
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-gray-50"
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">穿著 / 配件</label>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">穿著配飾</label>
                     <input 
                       type="text" 
                       value={character.clothing}
                       onChange={(e) => setCharacter({...character, clothing: e.target.value})}
-                      placeholder="角色穿什麼衣服或戴什麼配件？"
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all bg-gray-50"
                     />
                   </div>
                 </div>
-              </section>
 
-              <section className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-4">
-                  <Grid className="text-indigo-600 w-5 h-5" />
-                  <h2 className="text-lg font-bold">2. 貼圖關鍵字</h2>
+                <div className="mt-10 p-6 bg-gradient-to-br from-indigo-50 to-white rounded-2xl border border-indigo-100 flex items-center justify-between gap-6">
+                  <div>
+                    <h3 className="font-bold text-indigo-900 mb-1">自動劇本生成</h3>
+                    <p className="text-sm text-indigo-700/70">讓 Gemini 為您規劃 16 組 LINE 常用表情情境</p>
+                  </div>
+                  <button 
+                    onClick={handleAutoGenerateScenarios}
+                    disabled={isGeneratingPrompts}
+                    className="whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isGeneratingPrompts ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
+                    開始規劃
+                  </button>
                 </div>
-                <p className="text-sm text-gray-500 mb-4">輸入想要生成的表情或動作清單，以逗號分隔。</p>
-                <textarea 
-                  value={keywordsInput}
-                  onChange={(e) => setKeywordsInput(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
-                />
               </section>
-
-              <button 
-                onClick={handleStartPlanning}
-                disabled={isGeneratingPrompts}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isGeneratingPrompts ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> 正在規劃貼圖策略...</>
-                ) : (
-                  <>生成貼圖製作策略 <ChevronRight className="w-5 h-5" /></>
-                )}
-              </button>
             </div>
 
-            {/* Sidebar / Info */}
             <div className="space-y-6">
-              <div className="bg-indigo-50 rounded-2xl p-6 border border-indigo-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <Info className="text-indigo-600 w-5 h-5" />
-                  <h3 className="font-bold text-indigo-900">LINE 貼圖技術規範</h3>
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                <h3 className="font-bold flex items-center gap-2 mb-4 text-gray-800">
+                  <Smartphone className="w-5 h-5 text-indigo-600" /> 技術規範 Check
+                </h3>
+                <div className="space-y-3">
+                  {[
+                    "尺寸: 370x320 (偶數像素)",
+                    "透明背景 (PNG)",
+                    "四周 10px 留白",
+                    "一組需 8/16/24/32/40 張"
+                  ].map((t, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      {t}
+                    </div>
+                  ))}
                 </div>
-                <ul className="space-y-3 text-sm text-indigo-800">
-                  <li className="flex items-center gap-2">
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full" />
-                    尺寸上限：370 x 320 px
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full" />
-                    格式：透明背景 PNG
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full" />
-                    建議留白：四周至少 10px
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full" />
-                    長寬必須為偶數像素
-                  </li>
-                </ul>
               </div>
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h3 className="font-bold mb-3">角色預覽</h3>
-                <div className="aspect-square bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
-                   <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
-                   <p className="text-xs text-center px-4">生成後將在此顯示<br/>首張角色參考圖</p>
-                </div>
+              
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                <h3 className="font-bold mb-4 text-gray-800">角色參考基準</h3>
+                {character.referenceImage ? (
+                  <div className="relative group rounded-2xl overflow-hidden border border-gray-100 shadow-inner">
+                    <img src={character.referenceImage} className="w-full aspect-square object-contain p-2" />
+                    <button 
+                      onClick={() => setCharacter({...character, referenceImage: undefined})}
+                      className="absolute top-2 right-2 p-1.5 bg-white/80 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6 text-center">
+                    <ImageIcon className="w-10 h-10 mb-2 opacity-30" />
+                    <p className="text-xs">生成首張貼圖後<br/>將自動固定外型特徵</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -239,116 +232,148 @@ export default function App() {
           <div className="animate-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
               <div>
-                <button onClick={() => setStep(1)} className="text-indigo-600 text-sm font-medium hover:underline mb-2 flex items-center gap-1">
-                  ← 返回角色設定
+                <button onClick={() => setStep(1)} className="text-indigo-600 font-bold hover:underline mb-2 block">
+                  ← 重新設定角色
                 </button>
-                <h2 className="text-2xl font-bold">貼圖生成清單</h2>
-                <p className="text-gray-500">在開始製圖前，您可以預覽每張貼圖的視覺描述。</p>
+                <h2 className="text-2xl font-black text-gray-900">貼圖製作清單</h2>
               </div>
-              <div className="flex gap-2 w-full md:w-auto">
+              <div className="flex gap-3 w-full md:w-auto">
+                <button 
+                  onClick={generateLineAssets}
+                  className="px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-2xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+                >
+                  產生封底小圖
+                </button>
                 <button 
                   onClick={handleGenerateAll}
                   disabled={isGeneratingImages}
-                  className="flex-1 md:flex-none px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 md:flex-none px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
                 >
                   {isGeneratingImages ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                  全部生成
+                  批量生成
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {prompts.map((p) => (
-                <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col group">
-                  <div className="relative aspect-square mb-4 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center border border-gray-100">
+                <div key={p.id} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 group hover:shadow-md transition-shadow">
+                  <div className="relative aspect-square mb-4 bg-gray-50 rounded-2xl overflow-hidden border border-gray-50">
                     {p.status === 'done' && p.processedImage ? (
-                      <div className="relative w-full h-full p-2 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
-                         <img src={p.processedImage} alt={p.keyword} className="w-full h-full object-contain drop-shadow-md" />
-                         <button 
-                          onClick={() => downloadImage(p.processedImage!, p.keyword)}
-                          className="absolute bottom-2 right-2 p-2 bg-white/90 backdrop-blur rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                         >
-                            <Download className="w-4 h-4 text-indigo-600" />
-                         </button>
+                      <div className="w-full h-full p-2 bg-[radial-gradient(#e5e7eb_1.5px,transparent_1.5px)] [background-size:20px_20px]">
+                         <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-lg" />
+                         <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button onClick={() => downloadImage(p.processedImage!, p.keyword)} className="p-3 bg-white rounded-2xl text-indigo-600 shadow-xl hover:scale-110 transition-transform">
+                              <Download className="w-5 h-5" />
+                            </button>
+                            <button onClick={() => setChatMessages([...chatMessages, p.processedImage!])} className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl hover:scale-110 transition-transform">
+                              <MessageCircle className="w-5 h-5" />
+                            </button>
+                         </div>
                       </div>
                     ) : (
-                      <div className="text-center p-6">
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
                         {p.status === 'generating' ? (
-                          <div className="flex flex-col items-center">
-                            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
-                            <p className="text-xs text-gray-400 font-medium">正在繪製...</p>
-                          </div>
-                        ) : p.status === 'error' ? (
-                          <div className="text-red-400">
-                            <Trash2 className="w-8 h-8 mx-auto mb-2" />
-                            <p className="text-xs font-medium">生成失敗</p>
-                          </div>
+                          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-2" />
                         ) : (
-                          <ImageIcon className="w-10 h-10 text-gray-200 mx-auto" />
+                          <ImageIcon className="w-10 h-10 text-gray-200 mb-2" />
                         )}
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          {p.status === 'generating' ? '繪製中...' : '尚未生成'}
+                        </span>
                       </div>
                     )}
                   </div>
                   
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                        {p.keyword}
-                      </span>
-                      {p.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-gray-800">{p.keyword}</span>
+                      {p.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500 fill-green-50" />}
                     </div>
-                    <p className="text-[11px] text-gray-500 leading-tight line-clamp-3 italic mb-4">
-                      "{p.visualDescription}"
+                    <p className="text-[10px] text-gray-400 line-clamp-2 italic leading-relaxed">
+                      {p.visualDescription}
                     </p>
                   </div>
 
                   {p.status !== 'done' && p.status !== 'generating' && (
                     <button 
                       onClick={() => generateOneImage(p.id)}
-                      className="w-full mt-auto py-2 bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                      className="w-full mt-4 py-2.5 bg-gray-50 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 rounded-xl text-xs font-bold transition-colors"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
                       單張生成
                     </button>
                   )}
                 </div>
               ))}
-
-              <button 
-                onClick={() => setStep(1)}
-                className="rounded-2xl border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all flex flex-col items-center justify-center p-8 min-h-[300px] text-gray-400 hover:text-indigo-600"
-              >
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="font-semibold">新增更多貼圖</span>
-              </button>
             </div>
+
+            {/* Extra Assets Section */}
+            {linePack.main && (
+              <section className="mt-12 bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                  <Grid className="w-5 h-5 text-indigo-600" /> LINE 規格附屬圖檔
+                </h3>
+                <div className="flex gap-8">
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-500">Main (240x240)</p>
+                    <img src={linePack.main} className="w-24 h-24 bg-gray-50 rounded-xl border border-gray-100 p-2" />
+                    <button onClick={() => downloadImage(linePack.main!, 'main')} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                      <Download className="w-3 h-3" /> 下載
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-500">Tab (96x74)</p>
+                    <img src={linePack.tab} className="w-12 h-10 bg-gray-50 rounded-xl border border-gray-100 p-1" />
+                    <button onClick={() => downloadImage(linePack.tab!, 'tab')} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                      <Download className="w-3 h-3" /> 下載
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
       </main>
 
-      {/* Floating Action for Finish */}
-      {step === 2 && prompts.some(p => p.status === 'done') && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-gray-200 flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-gray-900">
-                已完成 {prompts.filter(p => p.status === 'done').length} 張貼圖
-              </span>
-              <span className="text-xs text-gray-500">已自動符合 LINE 規範格式</span>
+      {/* Chat Preview Drawer */}
+      {showChatPreview && (
+        <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-[60] border-l border-gray-200 flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-indigo-600 text-white">
+            <h3 className="font-bold">LINE 聊天室模擬器</h3>
+            <button onClick={() => setShowChatPreview(false)}><X className="w-5 h-5" /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#8CABD9]"> {/* Classic LINE BG color */}
+            <div className="flex items-start gap-2">
+              <div className="w-8 h-8 rounded-full bg-gray-300 flex-shrink-0" />
+              <div className="bg-white px-3 py-2 rounded-2xl rounded-tl-none text-sm shadow-sm max-w-[80%]">
+                這貼圖用起來感覺如何？
+              </div>
             </div>
-            <button 
-              onClick={() => {
-                prompts.filter(p => p.status === 'done').forEach(p => {
-                  if (p.processedImage) downloadImage(p.processedImage, p.keyword);
-                });
-              }}
-              className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors"
-            >
-              <Download className="w-4 h-4" /> 下載全部
-            </button>
+            {chatMessages.map((msg, i) => (
+              <div key={i} className="flex justify-end animate-in fade-in zoom-in duration-300">
+                <img src={msg} className="w-32 h-32 object-contain drop-shadow-md" />
+              </div>
+            ))}
+            {chatMessages.length === 0 && (
+              <div className="text-center text-white/60 text-xs py-20">
+                在貼圖上點擊 <MessageCircle className="w-3 h-3 inline" /> 即可預覽
+              </div>
+            )}
+          </div>
+          <div className="p-4 bg-gray-50 flex items-center gap-2">
+             <button onClick={() => setChatMessages([])} className="text-xs text-red-500 font-bold">清空對話</button>
           </div>
         </div>
       )}
+
+      {/* Footer Branding */}
+      <footer className="max-w-6xl mx-auto px-4 py-8 border-t border-gray-100 flex items-center justify-between text-gray-400 text-xs">
+        <p>© 2025 AI LINE Sticker Factory. 為創作者而生。</p>
+        <div className="flex gap-4">
+          <a href="#" className="hover:text-indigo-600">使用條款</a>
+          <a href="#" className="hover:text-indigo-600">隱私政策</a>
+        </div>
+      </footer>
     </div>
   );
 }

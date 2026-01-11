@@ -4,6 +4,7 @@ export interface CharacterConfig {
   features: string;
   clothing: string;
   style: string;
+  referenceImage?: string; // For consistency
 }
 
 export interface StickerPrompt {
@@ -15,8 +16,8 @@ export interface StickerPrompt {
   status: 'pending' | 'generating' | 'done' | 'error';
 }
 
-export interface GenerationStep {
-  id: number;
-  label: string;
-  description: string;
+export interface LinePack {
+  main?: string; // 240x240
+  tab?: string;  // 96x74
+  stickers: StickerPrompt[];
 }

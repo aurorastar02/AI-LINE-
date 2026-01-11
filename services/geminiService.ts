@@ -4,28 +4,27 @@ import { CharacterConfig, StickerPrompt } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-export const generateStickerPrompts = async (
+export const generateScenarios = async (
   character: CharacterConfig,
-  keywords: string[]
+  count: number = 24
 ): Promise<StickerPrompt[]> => {
   const ai = getAI();
-  const systemInstruction = `
-    你是一位專業的 LINE 貼圖設計師。
-    請為以下角色維持高度的外型一致性：
+  const systemInstruction = `你是一位資深的 LINE 貼圖劇本家。
+    請為以下角色設計 ${count} 個常用的 LINE 聊天情境（包含早安、收到、+1、崩潰、讚、問號、愛你、趕工中、晚安等）。
+    
+    角色描述：
     物種：${character.species}
-    核心特徵：${character.features}
+    特徵：${character.features}
     穿著：${character.clothing}
     藝術風格：${character.style}
     
-    針對使用者提供的每個關鍵字（如：謝謝、生氣），生成一段詳細的英文圖像描述（Image Prompt）。
-    描述必須包含以下關鍵要素以符合貼圖規範：
-    "die-cut sticker style", "white border", "isolated on pure white background", "flat illustration", "bold outlines", "high quality".
-    請確保圖片中「不要」出現任何文字。
-  `;
+    請確保輸出為 JSON 格式，每個物件包含 'keyword' (中文) 和 'visualDescription' (詳細的英文 Image Prompt)。
+    Image Prompt 必須包含："die-cut sticker style", "white border", "isolated on pure white background", "flat illustration", "bold outlines", "high contrast".
+    不可出現文字。`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `請為以下關鍵字生成貼圖描述：${keywords.join(', ')}`,
+    contents: `請生成 ${count} 個貼圖情境。`,
     config: {
       systemInstruction,
       responseMimeType: "application/json",
@@ -34,8 +33,8 @@ export const generateStickerPrompts = async (
         items: {
           type: Type.OBJECT,
           properties: {
-            keyword: { type: Type.STRING, description: "原始關鍵字" },
-            visualDescription: { type: Type.STRING, description: "詳細的英文圖像生成提示詞" }
+            keyword: { type: Type.STRING },
+            visualDescription: { type: Type.STRING }
           },
           required: ["keyword", "visualDescription"]
         }
@@ -45,24 +44,36 @@ export const generateStickerPrompts = async (
 
   const rawData = JSON.parse(response.text || '[]');
   return rawData.map((item: any, index: number) => ({
-    id: `prompt-${index}`,
+    id: `p-${Date.now()}-${index}`,
     keyword: item.keyword,
     visualDescription: item.visualDescription,
     status: 'pending'
   }));
 };
 
-export const generateStickerImage = async (prompt: string): Promise<string> => {
+export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
   const ai = getAI();
+  
+  const contents: any = {
+    parts: [{ text: prompt }]
+  };
+
+  if (referenceImage) {
+    const base64Data = referenceImage.split(',')[1];
+    contents.parts.unshift({
+      inlineData: {
+        data: base64Data,
+        mimeType: 'image/png'
+      }
+    });
+    contents.parts.push({ text: "Please keep the character appearance exactly like the reference image." });
+  }
+
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image',
-    contents: {
-      parts: [{ text: prompt }]
-    },
+    contents,
     config: {
-      imageConfig: {
-        aspectRatio: "1:1"
-      }
+      imageConfig: { aspectRatio: "1:1" }
     }
   });
 
