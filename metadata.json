@@ -1,0 +1,5 @@
+{
+  "name": "AI LINE 貼圖工廠",
+  "description": "使用 Gemini 和 Imagen 自動化設計並生成風格一致的 LINE 貼圖工作流。",
+  "requestFramePermissions": []
+}
