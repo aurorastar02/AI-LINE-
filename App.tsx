@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, Palette, Download, CheckCircle2, 
   Loader2, ImageIcon, Wand2, Layers, Dices, Info, ShieldCheck,
-  ChevronRight, Box, LayoutGrid, CheckSquare, ListOrdered
+  ChevronRight, Box, LayoutGrid, CheckSquare, ListOrdered, FileJson
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { CharacterConfig, StickerPrompt } from './types';
@@ -11,6 +11,7 @@ import { buildPrompt, generateStickerImage } from './services/geminiService';
 import { useStickerProcessor } from './hooks/useStickerProcessor';
 import { getRandomPreset } from './animalPresets';
 import { stickerScenarios } from './utils/scenarios';
+import { autoDeriveLineAssets } from './utils/StickerProcessor';
 
 export default function App() {
   const [step, setStep] = useState(1);
@@ -26,13 +27,14 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [generatingIndex, setGeneratingIndex] = useState(0);
+  const [lineAssets, setLineAssets] = useState<{ main?: string; tab?: string }>({});
+  
   const { processSticker } = useStickerProcessor();
 
   // Phase 1: 建立基準角色
   const handleEstablishCharacter = async () => {
     setIsGenerating(true);
     try {
-      // 基準角色使用中性站姿，綠幕背景
       const basePrompt = buildPrompt(character, "standing pose with a neutral expression, character sheet style");
       const rawImage = await generateStickerImage(basePrompt);
       const processed = await processSticker(rawImage);
@@ -46,7 +48,7 @@ export default function App() {
     }
   };
 
-  // 進入生產介面並初始化劇本
+  // 進入生產介面
   const prepareProduction = () => {
     const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
       id: `stk-${Date.now()}-${index}`,
@@ -55,20 +57,18 @@ export default function App() {
       status: 'pending'
     }));
     setPrompts(initialPrompts);
+    setLineAssets({}); // 重置資產
     setStep(2);
   };
 
-  // 單張生成邏輯 (封裝 API 呼叫、去背與規格校正)
-  const generateOne = async (id: string) => {
+  // 單張生成邏輯
+  const generateOne = async (id: string, index: number) => {
     setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'generating' } : p));
     try {
       const target = prompts.find(p => p.id === id);
       if (!target) return null;
 
-      // 1. 呼叫 Gemini API 生成帶有綠幕背景的圖片
       const raw = await generateStickerImage(target.visualDescription, character.referenceImage);
-      
-      // 2. 智慧校正：綠幕去背 + LINE 規格化 (370x320, 偶數, 10px 邊距)
       const processed = await processSticker(raw);
       
       if (processed) {
@@ -78,7 +78,15 @@ export default function App() {
           processedImage: processed.dataUrl, 
           status: 'done' as const 
         };
+        
         setPrompts(prev => prev.map(p => p.id === id ? updatedPrompt : p));
+
+        // 如果是第一張貼圖，自動產出 Main 與 Tab 資產
+        if (index === 0) {
+          const assets = await autoDeriveLineAssets(processed.dataUrl);
+          setLineAssets(assets);
+        }
+
         return updatedPrompt;
       }
     } catch (error) {
@@ -88,20 +96,18 @@ export default function App() {
     return null;
   };
 
-  // 批量自動化生成邏輯 (異步循環處理)
+  // 批量自動化生成邏輯
   const handleBatchGenerate = async () => {
     setIsBatchGenerating(true);
     setGeneratingIndex(0);
     
-    const pendingOnes = prompts.filter(p => p.status !== 'done');
+    const pendingOnes = prompts.map((p, idx) => ({ p, idx })).filter(item => item.p.status !== 'done');
     let count = 0;
 
-    // 使用 for...of 確保依序處理並即時更新畫面
-    for (const p of pendingOnes) {
+    for (const item of pendingOnes) {
       count++;
       setGeneratingIndex(count);
-      await generateOne(p.id);
-      // 微小延遲確保瀏覽器有時間渲染 UI
+      await generateOne(item.p.id, item.idx);
       await new Promise(r => setTimeout(r, 100));
     }
     
@@ -109,21 +115,35 @@ export default function App() {
     setGeneratingIndex(0);
   };
 
+  // 打包 ZIP 並下載
   const handleExportZip = async () => {
     const doneOnes = prompts.filter(p => p.status === 'done' && p.processedImage);
     if (doneOnes.length === 0) return alert("尚無已完成的貼圖可供下載");
     
     const zip = new JSZip();
+    
+    // 1. 加入貼圖本體 (01.png - XX.png)
     doneOnes.forEach((p, i) => {
       const b64 = p.processedImage!.split(',')[1];
       zip.file(`${String(i + 1).padStart(2, '0')}.png`, b64, { base64: true });
     });
+
+    // 2. 加入封面與標籤圖 (如果已生成)
+    if (lineAssets.main) {
+      zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
+    }
+    if (lineAssets.tab) {
+      zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
+    }
+
     const content = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(content);
-    link.download = `LINE_Sticker_Pack_${doneOnes.length}.zip`;
+    link.download = `LINE_Sticker_Pack_${doneOnes.length}_Assets.zip`;
     link.click();
   };
+
+  const isAllDone = useMemo(() => prompts.length > 0 && prompts.every(p => p.status === 'done'), [prompts]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans">
@@ -137,7 +157,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            Chroma Key 綠幕處理模式
+            自動產出 Main/Tab 必要資產
           </div>
         </div>
       </nav>
@@ -214,7 +234,7 @@ export default function App() {
                   <h3 className="font-black text-3xl mb-2 flex items-center gap-3">
                     <Box className="text-indigo-200" /> 批量生產配置
                   </h3>
-                  <p className="text-indigo-100 text-sm mb-8 max-w-md">選擇生成數量，系統將自動應用綠幕背景技術以確保細節與一致性。</p>
+                  <p className="text-indigo-100 text-sm mb-8 max-w-md">系統將自動利用第一張貼圖作為素材，為您產出 main.png 與 tab.png。</p>
                   
                   <div className="flex flex-col gap-4 mb-8">
                     <label className="text-[10px] font-black uppercase text-indigo-200 tracking-widest">選擇生成張數</label>
@@ -258,7 +278,7 @@ export default function App() {
                 <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                   <div className="flex gap-2 text-[11px] text-indigo-600 font-bold leading-relaxed">
                     <Info className="w-4 h-4 flex-shrink-0" />
-                    <div>系統將強制產出綠幕背景 (RGB 0, 255, 0)，以利後續自動精準去背。</div>
+                    <div>基準角色建立後，批量產出的貼圖將具備高度視覺一致性。</div>
                   </div>
                 </div>
               </div>
@@ -279,7 +299,7 @@ export default function App() {
                 </h2>
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex items-center gap-1.5 text-indigo-500 font-black text-sm">
-                    <ShieldCheck className="w-4 h-4" /> 綠幕去背引擎已啟動
+                    <ShieldCheck className="w-4 h-4" /> 智慧校正與資產派生已就緒
                   </div>
                 </div>
               </div>
@@ -301,6 +321,34 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {/* 必要資產預覽區 (Main / Tab) */}
+            {(lineAssets.main || lineAssets.tab) && (
+              <div className="mb-10 bg-white border border-indigo-100 p-8 rounded-[2.5rem] shadow-sm animate-in fade-in duration-500">
+                <h3 className="font-black text-indigo-600 text-sm flex items-center gap-2 mb-6 uppercase tracking-wider">
+                  <FileJson className="w-4 h-4" /> LINE 系統必要資產 (已自動派生)
+                </h3>
+                <div className="flex flex-wrap gap-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main (240x240)</label>
+                    <div className="w-32 h-32 bg-slate-50 rounded-2xl border-2 border-dashed border-indigo-100 flex items-center justify-center p-4">
+                      {lineAssets.main ? <img src={lineAssets.main} className="max-w-full max-h-full object-contain" /> : <Loader2 className="animate-spin text-indigo-200" />}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tab (96x74)</label>
+                    <div className="w-32 h-32 bg-slate-50 rounded-2xl border-2 border-dashed border-indigo-100 flex items-center justify-center p-4">
+                      {lineAssets.tab ? <img src={lineAssets.tab} className="w-[96px] h-[74px] object-contain" /> : <Loader2 className="animate-spin text-indigo-200" />}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-[200px] flex items-center">
+                    <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] text-indigo-600 font-bold border border-indigo-100">
+                      系統已自動擷取「01.打招呼」作為主視覺素材，並依照 LINE 官方比例自動縮放。
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 進度顯示條 */}
             {isBatchGenerating && (
@@ -349,7 +397,7 @@ export default function App() {
                       </div>
                     ) : (
                       <button 
-                        onClick={() => generateOne(p.id)}
+                        onClick={() => generateOne(p.id, idx)}
                         disabled={isBatchGenerating}
                         className="w-full h-full flex flex-col items-center justify-center group-hover:bg-slate-100 transition-colors disabled:opacity-30"
                       >
@@ -366,13 +414,13 @@ export default function App() {
               ))}
             </div>
 
-            {prompts.every(p => p.status === 'done') && prompts.length > 0 && (
+            {isAllDone && (
               <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto shadow-xl shadow-emerald-50 animate-in slide-in-from-top-4 duration-500">
                 <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-200">
                   <CheckSquare size={40} />
                 </div>
                 <h3 className="text-2xl font-black text-emerald-900 mb-2">全套貼圖已完成！</h3>
-                <p className="text-emerald-700 font-bold mb-8">所有圖片均已符合 LINE 370x320 偶數尺寸規範，且已完成綠幕精準去背。</p>
+                <p className="text-emerald-700 font-bold mb-8">包含 main.png, tab.png 與 {prompts.length} 組貼圖本體，皆已符合官方規範。</p>
                 <button 
                   onClick={handleExportZip}
                   className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-700 hover:scale-105 transition-all flex items-center gap-3 mx-auto"

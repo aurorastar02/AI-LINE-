@@ -1,6 +1,6 @@
 
 /**
- * LINE 貼圖規格工具組 - 綠幕專業版
+ * LINE 貼圖規格工具組 - 專業資產產出版
  */
 
 /**
@@ -37,7 +37,6 @@ export const checkTransparency = (imageSrc: string): Promise<boolean> => {
 
 /**
  * 綠幕去背工具：將純綠色背景轉為透明 (Chroma Key)
- * 解決白色細節遺失與白邊問題。
  */
 export const removeGreenBackground = (imageSrc: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -55,16 +54,12 @@ export const removeGreenBackground = (imageSrc: string): Promise<string> => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // 綠幕去背邏輯
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-
-        // 判斷是否為「顯著的綠色」(G 分量遠大於 R 和 B)
-        // 使用一個容差範圍來處理 AI 生成可能不完全是 0,255,0 的情況
         if (g > 150 && g > r * 1.4 && g > b * 1.4) {
-          data[i + 3] = 0; // 設為透明
+          data[i + 3] = 0; 
         }
       }
 
@@ -77,10 +72,7 @@ export const removeGreenBackground = (imageSrc: string): Promise<string> => {
 };
 
 /**
- * 自動規格校正器 (formatStickerForLine)
- * 1. 符合 370x320 限制
- * 2. 強制偶數尺寸
- * 3. 確保 10px 透明留白
+ * 自動規格校正器：處理貼圖本體 (01.png - 40.png)
  */
 export const formatStickerForLine = async (
   base64: string,
@@ -105,7 +97,7 @@ export const formatStickerForLine = async (
       for (let y = 0; y < img.height; y++) {
         for (let x = 0; x < img.width; x++) {
           const idx = (y * img.width + x) * 4;
-          if (data[idx + 3] > 10) { // 有感的透明度才算內容
+          if (data[idx + 3] > 10) { 
             foundContent = true;
             minX = Math.min(minX, x);
             minY = Math.min(minY, y);
@@ -152,6 +144,39 @@ export const formatStickerForLine = async (
         height: finalH
       });
     };
+    img.src = base64;
+  });
+};
+
+/**
+ * 產出固定尺寸資產 (Main: 240x240, Tab: 96x74)
+ * 確保 Object-fit: contain 效果並置中
+ */
+export const createFixedSizeAsset = (base64: string, targetW: number, targetH: number): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject("Canvas context error");
+
+      // 清除背景 (確保透明)
+      ctx.clearRect(0, 0, targetW, targetH);
+
+      // 計算 contain 縮放比例
+      const ratio = Math.min(targetW / img.width, targetH / img.height);
+      const drawW = img.width * ratio;
+      const drawH = img.height * ratio;
+      const x = (targetW - drawW) / 2;
+      const y = (targetH - drawH) / 2;
+
+      ctx.drawImage(img, x, y, drawW, drawH);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject("Asset creation error");
     img.src = base64;
   });
 };
