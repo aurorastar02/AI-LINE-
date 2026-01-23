@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
   Sparkles, Palette, Download, CheckCircle2, 
   Loader2, ImageIcon, Wand2, Layers, Dices, Info, ShieldCheck,
-  ChevronRight, Box, LayoutGrid, CheckSquare
+  ChevronRight, Box, LayoutGrid, CheckSquare, ListOrdered
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { CharacterConfig, StickerPrompt } from './types';
@@ -32,6 +32,7 @@ export default function App() {
   const handleEstablishCharacter = async () => {
     setIsGenerating(true);
     try {
+      // 基準角色使用中性站姿，綠幕背景
       const basePrompt = buildPrompt(character, "standing pose with a neutral expression, character sheet style");
       const rawImage = await generateStickerImage(basePrompt);
       const processed = await processSticker(rawImage);
@@ -45,7 +46,7 @@ export default function App() {
     }
   };
 
-  // 進入生產介面
+  // 進入生產介面並初始化劇本
   const prepareProduction = () => {
     const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
       id: `stk-${Date.now()}-${index}`,
@@ -57,14 +58,17 @@ export default function App() {
     setStep(2);
   };
 
-  // 單張生成邏輯
+  // 單張生成邏輯 (封裝 API 呼叫、去背與規格校正)
   const generateOne = async (id: string) => {
     setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'generating' } : p));
     try {
       const target = prompts.find(p => p.id === id);
       if (!target) return null;
 
+      // 1. 呼叫 Gemini API 生成帶有綠幕背景的圖片
       const raw = await generateStickerImage(target.visualDescription, character.referenceImage);
+      
+      // 2. 智慧校正：綠幕去背 + LINE 規格化 (370x320, 偶數, 10px 邊距)
       const processed = await processSticker(raw);
       
       if (processed) {
@@ -78,12 +82,13 @@ export default function App() {
         return updatedPrompt;
       }
     } catch (error) {
+      console.error("生成單張失敗:", error);
       setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'error' } : p));
     }
     return null;
   };
 
-  // 批量自動化生成邏輯 (異步循環)
+  // 批量自動化生成邏輯 (異步循環處理)
   const handleBatchGenerate = async () => {
     setIsBatchGenerating(true);
     setGeneratingIndex(0);
@@ -91,11 +96,12 @@ export default function App() {
     const pendingOnes = prompts.filter(p => p.status !== 'done');
     let count = 0;
 
+    // 使用 for...of 確保依序處理並即時更新畫面
     for (const p of pendingOnes) {
       count++;
       setGeneratingIndex(count);
       await generateOne(p.id);
-      // 加入微小延遲確保 UI 更新
+      // 微小延遲確保瀏覽器有時間渲染 UI
       await new Promise(r => setTimeout(r, 100));
     }
     
@@ -131,7 +137,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            智慧校正 & 批量處理
+            Chroma Key 綠幕處理模式
           </div>
         </div>
       </nav>
@@ -208,18 +214,21 @@ export default function App() {
                   <h3 className="font-black text-3xl mb-2 flex items-center gap-3">
                     <Box className="text-indigo-200" /> 批量生產配置
                   </h3>
-                  <p className="text-indigo-100 text-sm mb-8 max-w-md">選擇您想要生成的貼圖數量，系統將自動從劇本庫中挑選對應的情境進行生產。</p>
+                  <p className="text-indigo-100 text-sm mb-8 max-w-md">選擇生成數量，系統將自動應用綠幕背景技術以確保細節與一致性。</p>
                   
-                  <div className="grid grid-cols-5 gap-3 mb-8">
-                    {[8, 16, 24, 32, 40].map(count => (
-                      <button 
-                        key={count}
-                        onClick={() => setStickerCount(count)}
-                        className={`py-4 rounded-2xl font-black transition-all ${stickerCount === count ? 'bg-white text-indigo-600 scale-110 shadow-lg' : 'bg-indigo-500 text-indigo-100 hover:bg-indigo-400'}`}
-                      >
-                        {count}
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-4 mb-8">
+                    <label className="text-[10px] font-black uppercase text-indigo-200 tracking-widest">選擇生成張數</label>
+                    <div className="flex flex-wrap gap-3">
+                      {[8, 16, 24, 32, 40].map(count => (
+                        <button 
+                          key={count}
+                          onClick={() => setStickerCount(count)}
+                          className={`flex-1 min-w-[60px] py-4 rounded-2xl font-black transition-all ${stickerCount === count ? 'bg-white text-indigo-600 scale-105 shadow-lg ring-4 ring-white/20' : 'bg-indigo-500 text-indigo-100 hover:bg-indigo-400'}`}
+                        >
+                          {count}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <button 
@@ -249,7 +258,7 @@ export default function App() {
                 <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                   <div className="flex gap-2 text-[11px] text-indigo-600 font-bold leading-relaxed">
                     <Info className="w-4 h-4 flex-shrink-0" />
-                    <div>基準角色能有效引導 AI 保持 40 張貼圖的色彩與特徵一致。</div>
+                    <div>系統將強制產出綠幕背景 (RGB 0, 255, 0)，以利後續自動精準去背。</div>
                   </div>
                 </div>
               </div>
@@ -270,7 +279,7 @@ export default function App() {
                 </h2>
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex items-center gap-1.5 text-indigo-500 font-black text-sm">
-                    <ShieldCheck className="w-4 h-4" /> 智慧校正已就緒
+                    <ShieldCheck className="w-4 h-4" /> 綠幕去背引擎已啟動
                   </div>
                 </div>
               </div>
@@ -295,19 +304,19 @@ export default function App() {
 
             {/* 進度顯示條 */}
             {isBatchGenerating && (
-              <div className="mb-10 bg-white border p-6 rounded-3xl shadow-sm animate-pulse">
+              <div className="mb-10 bg-white border-2 border-indigo-100 p-8 rounded-[2.5rem] shadow-xl shadow-indigo-50 animate-in zoom-in duration-300">
                 <div className="flex justify-between items-end mb-4">
-                  <div className="font-black text-indigo-600 flex items-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    正在生產第 {generatingIndex} / {prompts.length} 張...
+                  <div className="font-black text-indigo-600 flex items-center gap-3 text-lg">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    正在處理：{prompts[generatingIndex - 1]?.keyword || '準備中'}
                   </div>
-                  <div className="text-xs font-bold text-slate-400">
-                    {Math.round((generatingIndex / prompts.length) * 100)}%
+                  <div className="text-sm font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                    第 {generatingIndex} / {prompts.length} 張
                   </div>
                 </div>
-                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden p-1">
                   <div 
-                    className="h-full bg-indigo-600 transition-all duration-500" 
+                    className="h-full bg-indigo-600 rounded-full transition-all duration-700 ease-out" 
                     style={{ width: `${(generatingIndex / prompts.length) * 100}%` }}
                   ></div>
                 </div>
@@ -320,10 +329,10 @@ export default function App() {
                   <div className="absolute -top-2 -left-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-black text-xs z-10 shadow-lg">
                     {idx + 1}
                   </div>
-                  <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden relative">
+                  <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden relative border border-slate-100">
                     {p.status === 'done' ? (
-                      <div className="w-full h-full p-4 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-100/30">
-                        <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-xl" />
+                      <div className="w-full h-full p-4 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-200/20">
+                        <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-xl" alt={p.keyword} />
                         <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-1 text-white shadow-lg animate-in zoom-in duration-300">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
@@ -331,7 +340,12 @@ export default function App() {
                     ) : p.status === 'generating' ? (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50/50">
                         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-tighter">處理中...</span>
+                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-tighter">AI 繪圖 & 校正</span>
+                      </div>
+                    ) : p.status === 'error' ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
+                        <Info className="w-6 h-6 text-red-400 mb-2" />
+                        <span className="text-[10px] font-black text-red-400">生成錯誤</span>
                       </div>
                     ) : (
                       <button 
@@ -346,24 +360,24 @@ export default function App() {
                   </div>
                   <div className="px-1 text-center">
                     <div className="font-black text-base text-slate-800 line-clamp-1">{p.keyword}</div>
-                    <div className="text-[9px] text-slate-400 font-bold leading-tight mt-1 line-clamp-1 opacity-50">{p.visualDescription}</div>
+                    <div className="text-[9px] text-slate-400 font-bold leading-tight mt-1 line-clamp-1 opacity-50">{stickerScenarios[idx]}</div>
                   </div>
                 </div>
               ))}
             </div>
 
             {prompts.every(p => p.status === 'done') && prompts.length > 0 && (
-              <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto">
-                <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-100">
+              <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto shadow-xl shadow-emerald-50 animate-in slide-in-from-top-4 duration-500">
+                <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-200">
                   <CheckSquare size={40} />
                 </div>
                 <h3 className="text-2xl font-black text-emerald-900 mb-2">全套貼圖已完成！</h3>
-                <p className="text-emerald-700 font-bold mb-8">所有圖片均已符合 LINE 370x320 偶數尺寸規範與 10px 邊距要求。</p>
+                <p className="text-emerald-700 font-bold mb-8">所有圖片均已符合 LINE 370x320 偶數尺寸規範，且已完成綠幕精準去背。</p>
                 <button 
                   onClick={handleExportZip}
-                  className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-3 mx-auto"
+                  className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-700 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
                 >
-                  <Download className="w-6 h-6" /> 下載 LINE 貼圖包
+                  <Download className="w-6 h-6" /> 下載 LINE 貼圖包 (ZIP)
                 </button>
               </div>
             )}
