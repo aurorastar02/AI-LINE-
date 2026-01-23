@@ -1,34 +1,32 @@
 
 import { useState, useCallback } from 'react';
-import { processStickerImage, ProcessedSticker } from '../utils/imageUtils';
+import { checkTransparency, removeWhiteBackground, formatStickerForLine } from '../utils/stickerUtils';
 
-interface UseStickerProcessorReturn {
-  process: (base64: string) => Promise<ProcessedSticker | null>;
-  isProcessing: boolean;
-  error: string | null;
-}
-
-/**
- * 專為 LINE 貼圖設計的影像處理 Hook
- */
-export const useStickerProcessor = (): UseStickerProcessorReturn => {
+export const useStickerProcessor = () => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const process = useCallback(async (base64: string): Promise<ProcessedSticker | null> => {
+  const processSticker = useCallback(async (base64: string) => {
     setIsProcessing(true);
-    setError(null);
     try {
-      const result = await processStickerImage(base64);
+      // 1. 智慧影像過濾器
+      const hasAlpha = await checkTransparency(base64);
+      let workingBase64 = base64;
+
+      if (!hasAlpha) {
+        console.log("偵測到不透明背景，執行基礎色度去背...");
+        workingBase64 = await removeWhiteBackground(base64);
+      }
+
+      // 2. 自動規格校正器
+      const result = await formatStickerForLine(workingBase64);
       return result;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
+      console.error("處理貼圖失敗:", err);
       return null;
     } finally {
       setIsProcessing(false);
     }
   }, []);
 
-  return { process, isProcessing, error };
+  return { processSticker, isProcessing };
 };
