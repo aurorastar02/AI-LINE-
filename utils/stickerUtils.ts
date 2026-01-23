@@ -1,6 +1,6 @@
 
 /**
- * LINE 貼圖規格工具組
+ * LINE 貼圖規格工具組 - 綠幕專業版
  */
 
 /**
@@ -22,14 +22,13 @@ export const checkTransparency = (imageSrc: string): Promise<boolean> => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // 檢查 Alpha 通道 (索引 3, 7, 11...)
       for (let i = 3; i < data.length; i += 4) {
         if (data[i] < 250) {
-          resolve(true); // 發現透明像素
+          resolve(true); 
           return;
         }
       }
-      resolve(false); // 全不透明
+      resolve(false);
     };
     img.onerror = (err) => reject(err);
     img.src = imageSrc;
@@ -37,9 +36,10 @@ export const checkTransparency = (imageSrc: string): Promise<boolean> => {
 };
 
 /**
- * 簡易去背工具：將純白底轉為透明 (當圖片不具備透明度時的備案)
+ * 綠幕去背工具：將純綠色背景轉為透明 (Chroma Key)
+ * 解決白色細節遺失與白邊問題。
  */
-export const removeWhiteBackground = (imageSrc: string): Promise<string> => {
+export const removeGreenBackground = (imageSrc: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
@@ -55,17 +55,23 @@ export const removeWhiteBackground = (imageSrc: string): Promise<string> => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
+      // 綠幕去背邏輯
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
-        // 如果接近白色 (RGB > 240)
-        if (r > 240 && g > 240 && b > 240) {
-          data[i + 3] = 0; // 設為全透明
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        // 判斷是否為「顯著的綠色」(G 分量遠大於 R 和 B)
+        // 使用一個容差範圍來處理 AI 生成可能不完全是 0,255,0 的情況
+        if (g > 150 && g > r * 1.4 && g > b * 1.4) {
+          data[i + 3] = 0; // 設為透明
         }
       }
 
       ctx.putImageData(imageData, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
+    img.onerror = (err) => reject(err);
     img.src = imageSrc;
   });
 };
@@ -94,13 +100,12 @@ export const formatStickerForLine = async (
       const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
       const data = imageData.data;
 
-      // 1. 偵測內容邊界 (Trim)
       let minX = img.width, minY = img.height, maxX = 0, maxY = 0;
       let foundContent = false;
       for (let y = 0; y < img.height; y++) {
         for (let x = 0; x < img.width; x++) {
           const idx = (y * img.width + x) * 4;
-          if (data[idx + 3] > 0) {
+          if (data[idx + 3] > 10) { // 有感的透明度才算內容
             foundContent = true;
             minX = Math.min(minX, x);
             minY = Math.min(minY, y);
@@ -117,16 +122,13 @@ export const formatStickerForLine = async (
       const contentW = maxX - minX + 1;
       const contentH = maxY - minY + 1;
 
-      // 2. 計算目標尺寸 (需留 10px 邊距)
       let targetW = contentW + config.margin * 2;
       let targetH = contentH + config.margin * 2;
 
-      // 比例縮放以符合最大限制
       const ratio = Math.min(config.maxW / targetW, config.maxH / targetH, 1);
       let finalW = Math.floor(targetW * ratio);
       let finalH = Math.floor(targetH * ratio);
 
-      // 3. 強制偶數像素 (LINE 嚴格要求)
       if (finalW % 2 !== 0) finalW -= 1;
       if (finalH % 2 !== 0) finalH -= 1;
 
@@ -136,7 +138,6 @@ export const formatStickerForLine = async (
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject("Context error");
 
-      // 計算繪製內容的大小 (扣掉比例後的邊距)
       const drawMargin = config.margin * ratio;
       const drawW = finalW - drawMargin * 2;
       const drawH = finalH - drawMargin * 2;

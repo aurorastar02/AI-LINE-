@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
 import { 
-  Sparkles, Palette, Smartphone, Download, CheckCircle2, 
-  Loader2, ImageIcon, Wand2, Layers, Dices, Info, ShieldCheck
+  Sparkles, Palette, Download, CheckCircle2, 
+  Loader2, ImageIcon, Wand2, Layers, Dices, Info, ShieldCheck,
+  ChevronRight, Box, LayoutGrid, CheckSquare
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { CharacterConfig, StickerPrompt } from './types';
-import { generateScenarioPrompts, generateStickerImage } from './services/geminiService';
+import { buildPrompt, generateStickerImage } from './services/geminiService';
 import { useStickerProcessor } from './hooks/useStickerProcessor';
 import { getRandomPreset } from './animalPresets';
+import { stickerScenarios } from './utils/scenarios';
 
 export default function App() {
   const [step, setStep] = useState(1);
@@ -19,60 +21,92 @@ export default function App() {
     style: 'Q版比例 (Chibi)，粗輪廓線，平塗色塊'
   });
   
+  const [stickerCount, setStickerCount] = useState(8);
   const [prompts, setPrompts] = useState<StickerPrompt[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [generatingIndex, setGeneratingIndex] = useState(0);
   const { processSticker } = useStickerProcessor();
 
-  // Phase 1: 建立基準角色 (為了確保一致性)
+  // Phase 1: 建立基準角色
   const handleEstablishCharacter = async () => {
     setIsGenerating(true);
     try {
-      const basePrompt = `Base character design of a ${character.style} ${character.species}, ${character.features}, wearing ${character.clothing}. Isolated on white background, full body, standing pose.`;
+      const basePrompt = buildPrompt(character, "standing pose with a neutral expression, character sheet style");
       const rawImage = await generateStickerImage(basePrompt);
       const processed = await processSticker(rawImage);
       if (processed) {
         setCharacter(prev => ({ ...prev, referenceImage: processed.dataUrl }));
       }
     } catch (error) {
-      alert("建立角色基準失敗");
+      alert("建立角色基準失敗，請稍後再試");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Phase 2: 啟動批量生產
-  const handleStartProduction = (count: number) => {
-    const fullPrompts = generateScenarioPrompts(character).slice(0, count);
-    setPrompts(fullPrompts);
+  // 進入生產介面
+  const prepareProduction = () => {
+    const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
+      id: `stk-${Date.now()}-${index}`,
+      keyword: action.split(' ')[0],
+      visualDescription: buildPrompt(character, action),
+      status: 'pending'
+    }));
+    setPrompts(initialPrompts);
     setStep(2);
   };
 
+  // 單張生成邏輯
   const generateOne = async (id: string) => {
     setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'generating' } : p));
     try {
       const target = prompts.find(p => p.id === id);
-      if (!target) return;
+      if (!target) return null;
 
       const raw = await generateStickerImage(target.visualDescription, character.referenceImage);
       const processed = await processSticker(raw);
       
       if (processed) {
-        setPrompts(prev => prev.map(p => 
-          p.id === id ? { 
-            ...p, 
-            generatedImage: raw, 
-            processedImage: processed.dataUrl, 
-            status: 'done' 
-          } : p
-        ));
+        const updatedPrompt = { 
+          ...target, 
+          generatedImage: raw, 
+          processedImage: processed.dataUrl, 
+          status: 'done' as const 
+        };
+        setPrompts(prev => prev.map(p => p.id === id ? updatedPrompt : p));
+        return updatedPrompt;
       }
     } catch (error) {
       setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'error' } : p));
     }
+    return null;
+  };
+
+  // 批量自動化生成邏輯 (異步循環)
+  const handleBatchGenerate = async () => {
+    setIsBatchGenerating(true);
+    setGeneratingIndex(0);
+    
+    const pendingOnes = prompts.filter(p => p.status !== 'done');
+    let count = 0;
+
+    for (const p of pendingOnes) {
+      count++;
+      setGeneratingIndex(count);
+      await generateOne(p.id);
+      // 加入微小延遲確保 UI 更新
+      await new Promise(r => setTimeout(r, 100));
+    }
+    
+    setIsBatchGenerating(false);
+    setGeneratingIndex(0);
   };
 
   const handleExportZip = async () => {
     const doneOnes = prompts.filter(p => p.status === 'done' && p.processedImage);
+    if (doneOnes.length === 0) return alert("尚無已完成的貼圖可供下載");
+    
     const zip = new JSZip();
     doneOnes.forEach((p, i) => {
       const b64 = p.processedImage!.split(',')[1];
@@ -81,24 +115,23 @@ export default function App() {
     const content = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(content);
-    link.download = "LINE_Sticker_Pack.zip";
+    link.download = `LINE_Sticker_Pack_${doneOnes.length}.zip`;
     link.click();
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans">
-      {/* Navbar */}
       <nav className="h-16 border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 flex items-center px-6 justify-between">
         <div className="flex items-center gap-2">
           <div className="bg-indigo-600 p-1.5 rounded-lg">
             <Sparkles className="text-white w-5 h-5" />
           </div>
-          <span className="font-black text-xl tracking-tight">STICKER FACTORY</span>
+          <span className="font-black text-xl tracking-tight">AI 貼圖工廠 PRO</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            自動符合 LINE 規範
+            智慧校正 & 批量處理
           </div>
         </div>
       </nav>
@@ -106,7 +139,6 @@ export default function App() {
       <main className="max-w-6xl mx-auto p-6 md:p-10">
         {step === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* 左側：設定表單 */}
             <div className="lg:col-span-2 space-y-8">
               <div className="bg-white rounded-3xl p-8 border shadow-sm">
                 <div className="flex items-center justify-between mb-8">
@@ -117,13 +149,13 @@ export default function App() {
                     onClick={() => setCharacter({ ...character, ...getRandomPreset() })}
                     className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors flex items-center gap-1"
                   >
-                    <Dices className="w-3.5 h-3.5" /> 隨機靈感
+                    <Dices className="w-3.5 h-3.5" /> 隨機預設
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">物種名稱</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">角色物種</label>
                     <input 
                       type="text" value={character.species} 
                       onChange={e => setCharacter({...character, species: e.target.value})}
@@ -131,7 +163,7 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">畫風風格</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">藝術風格</label>
                     <input 
                       type="text" value={character.style} 
                       onChange={e => setCharacter({...character, style: e.target.value})}
@@ -139,7 +171,7 @@ export default function App() {
                     />
                   </div>
                   <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">長相細節 (眼睛、花紋等)</label>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">長相特徵</label>
                     <textarea 
                       value={character.features} rows={2}
                       onChange={e => setCharacter({...character, features: e.target.value})}
@@ -156,63 +188,68 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="mt-10 flex gap-4">
+                <div className="mt-10">
                   <button 
                     onClick={handleEstablishCharacter}
                     disabled={isGenerating}
-                    className="flex-1 bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-slate-200"
                   >
                     {isGenerating ? <Loader2 className="animate-spin" /> : <Wand2 className="w-5 h-5" />}
-                    建立角色基準 (確保一致性)
+                    生成角色基準 (必備步驟)
                   </button>
                 </div>
               </div>
 
-              {/* 批量按鈕區 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-indigo-600 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200">
-                  <h3 className="font-black text-xl mb-2">啟動 10 張生產</h3>
-                  <p className="text-indigo-100 text-sm mb-6">快速測試角色在不同情緒下的表現。</p>
-                  <button 
-                    onClick={() => handleStartProduction(10)}
-                    disabled={!character.referenceImage}
-                    className="w-full bg-white text-indigo-600 font-black py-4 rounded-xl shadow-lg disabled:opacity-50 hover:scale-[1.02] transition-transform"
-                  >
-                    開始批量生產
-                  </button>
+              <div className="bg-indigo-600 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                  <LayoutGrid size={120} />
                 </div>
-                <div className="bg-emerald-600 rounded-3xl p-8 text-white shadow-xl shadow-emerald-200">
-                  <h3 className="font-black text-xl mb-2">啟動 40 張全套</h3>
-                  <p className="text-emerald-100 text-sm mb-6">一次生成 LINE 最常用的全套常用詞。</p>
+                <div className="relative z-10">
+                  <h3 className="font-black text-3xl mb-2 flex items-center gap-3">
+                    <Box className="text-indigo-200" /> 批量生產配置
+                  </h3>
+                  <p className="text-indigo-100 text-sm mb-8 max-w-md">選擇您想要生成的貼圖數量，系統將自動從劇本庫中挑選對應的情境進行生產。</p>
+                  
+                  <div className="grid grid-cols-5 gap-3 mb-8">
+                    {[8, 16, 24, 32, 40].map(count => (
+                      <button 
+                        key={count}
+                        onClick={() => setStickerCount(count)}
+                        className={`py-4 rounded-2xl font-black transition-all ${stickerCount === count ? 'bg-white text-indigo-600 scale-110 shadow-lg' : 'bg-indigo-500 text-indigo-100 hover:bg-indigo-400'}`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+
                   <button 
-                    onClick={() => handleStartProduction(40)}
+                    onClick={prepareProduction}
                     disabled={!character.referenceImage}
-                    className="w-full bg-white text-emerald-600 font-black py-4 rounded-xl shadow-lg disabled:opacity-50 hover:scale-[1.02] transition-transform"
+                    className="w-full bg-white text-indigo-600 font-black py-5 rounded-2xl disabled:opacity-50 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 group shadow-xl"
                   >
-                    生成全套 40 張
+                    進入生產流水線 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* 右側：預覽基準 */}
             <div className="space-y-6">
-              <div className="bg-white rounded-3xl p-8 border shadow-sm">
-                <h3 className="font-black text-slate-400 text-xs tracking-widest uppercase mb-6">基準參考 (Consistency Base)</h3>
+              <div className="bg-white rounded-3xl p-8 border shadow-sm sticky top-24">
+                <h3 className="font-black text-slate-400 text-[10px] tracking-widest uppercase mb-6">基準角色預覽</h3>
                 {character.referenceImage ? (
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">
-                    <img src={character.referenceImage} className="w-full aspect-square object-contain drop-shadow-xl" />
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200 aspect-square flex items-center justify-center overflow-hidden">
+                    <img src={character.referenceImage} className="max-w-full max-h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform" />
                   </div>
                 ) : (
                   <div className="aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300">
                     <ImageIcon className="w-12 h-12 mb-3 opacity-20" />
-                    <p className="text-[10px] font-black text-center px-8 uppercase">請先建立基準角色<br/>系統將以此維持 40 張貼圖一致</p>
+                    <p className="text-[10px] font-black text-center px-8 uppercase">尚未建立基準</p>
                   </div>
                 )}
-                <div className="mt-6 space-y-3">
-                  <div className="flex items-start gap-2 text-xs text-slate-400 font-bold">
-                    <Info className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-                    基準角色將作為後續所有貼圖的視覺藍本。
+                <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                  <div className="flex gap-2 text-[11px] text-indigo-600 font-bold leading-relaxed">
+                    <Info className="w-4 h-4 flex-shrink-0" />
+                    <div>基準角色能有效引導 AI 保持 40 張貼圖的色彩與特徵一致。</div>
                   </div>
                 </div>
               </div>
@@ -222,50 +259,114 @@ export default function App() {
 
         {step === 2 && (
           <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-12 gap-6">
               <div>
-                <button onClick={() => setStep(1)} className="text-indigo-600 font-black text-sm mb-2 hover:underline">← 返回角色設定</button>
-                <h2 className="text-4xl font-black tracking-tight">貼圖生產流水線 ({prompts.length})</h2>
-                <p className="text-slate-400 font-bold">自動校正機制：370x320 偶數尺寸、10px 安全邊距</p>
+                <button onClick={() => setStep(1)} className="text-indigo-600 font-black text-sm mb-2 flex items-center gap-1 hover:underline">
+                  <ChevronRight className="w-4 h-4 rotate-180" /> 返回設定
+                </button>
+                <h2 className="text-4xl font-black tracking-tight flex items-center gap-4">
+                  生產流水線 
+                  <span className="text-lg bg-slate-200 px-3 py-1 rounded-full text-slate-600">{prompts.length} 張</span>
+                </h2>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5 text-indigo-500 font-black text-sm">
+                    <ShieldCheck className="w-4 h-4" /> 智慧校正已就緒
+                  </div>
+                </div>
               </div>
-              <button 
-                onClick={handleExportZip}
-                className="bg-slate-900 text-white px-10 py-5 rounded-2xl font-black shadow-2xl flex items-center gap-3 hover:scale-105 transition-all"
-              >
-                <Download className="w-6 h-6" /> 下載全套 ZIP
-              </button>
+              
+              <div className="flex flex-wrap gap-4">
+                <button 
+                  onClick={handleBatchGenerate}
+                  disabled={isBatchGenerating}
+                  className="bg-indigo-600 text-white px-8 py-5 rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center gap-3 hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isBatchGenerating ? <Loader2 className="animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                  啟動批量生成
+                </button>
+                <button 
+                  onClick={handleExportZip}
+                  className="bg-slate-900 text-white px-8 py-5 rounded-2xl font-black shadow-xl flex items-center gap-3 hover:bg-slate-800"
+                >
+                  <Download className="w-5 h-5" /> 打包下載 ZIP
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {prompts.map(p => (
-                <div key={p.id} className="bg-white border rounded-[2rem] p-5 hover:shadow-xl transition-all group">
+            {/* 進度顯示條 */}
+            {isBatchGenerating && (
+              <div className="mb-10 bg-white border p-6 rounded-3xl shadow-sm animate-pulse">
+                <div className="flex justify-between items-end mb-4">
+                  <div className="font-black text-indigo-600 flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    正在生產第 {generatingIndex} / {prompts.length} 張...
+                  </div>
+                  <div className="text-xs font-bold text-slate-400">
+                    {Math.round((generatingIndex / prompts.length) * 100)}%
+                  </div>
+                </div>
+                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-600 transition-all duration-500" 
+                    style={{ width: `${(generatingIndex / prompts.length) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {prompts.map((p, idx) => (
+                <div key={p.id} className={`bg-white border rounded-[2rem] p-5 transition-all group relative ${p.status === 'done' ? 'hover:shadow-2xl' : ''}`}>
+                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-black text-xs z-10 shadow-lg">
+                    {idx + 1}
+                  </div>
                   <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden relative">
                     {p.status === 'done' ? (
-                      <div className="w-full h-full p-3 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px]">
-                        <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-lg" />
-                        <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-1 text-white">
-                          <CheckCircle2 className="w-3 h-3" />
+                      <div className="w-full h-full p-4 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-100/30">
+                        <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-xl" />
+                        <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-1 text-white shadow-lg animate-in zoom-in duration-300">
+                          <CheckCircle2 className="w-4 h-4" />
                         </div>
                       </div>
                     ) : p.status === 'generating' ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50/30">
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50/50">
                         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase">繪製中...</span>
+                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-tighter">處理中...</span>
                       </div>
                     ) : (
                       <button 
                         onClick={() => generateOne(p.id)}
-                        className="w-full h-full flex items-center justify-center group-hover:bg-slate-100 transition-colors"
+                        disabled={isBatchGenerating}
+                        className="w-full h-full flex flex-col items-center justify-center group-hover:bg-slate-100 transition-colors disabled:opacity-30"
                       >
-                        <Wand2 className="w-6 h-6 text-slate-200 group-hover:text-indigo-400" />
+                        <Wand2 className="w-6 h-6 text-slate-200 group-hover:text-indigo-400 mb-2" />
+                        <span className="text-[10px] font-black text-slate-300 group-hover:text-indigo-300">點擊生成</span>
                       </button>
                     )}
                   </div>
-                  <div className="text-center font-black text-lg">{p.keyword}</div>
-                  <div className="text-[10px] text-slate-300 font-bold text-center mt-1 truncate px-2">{p.visualDescription}</div>
+                  <div className="px-1 text-center">
+                    <div className="font-black text-base text-slate-800 line-clamp-1">{p.keyword}</div>
+                    <div className="text-[9px] text-slate-400 font-bold leading-tight mt-1 line-clamp-1 opacity-50">{p.visualDescription}</div>
+                  </div>
                 </div>
               ))}
             </div>
+
+            {prompts.every(p => p.status === 'done') && prompts.length > 0 && (
+              <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto">
+                <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-100">
+                  <CheckSquare size={40} />
+                </div>
+                <h3 className="text-2xl font-black text-emerald-900 mb-2">全套貼圖已完成！</h3>
+                <p className="text-emerald-700 font-bold mb-8">所有圖片均已符合 LINE 370x320 偶數尺寸規範與 10px 邊距要求。</p>
+                <button 
+                  onClick={handleExportZip}
+                  className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-700 transition-all flex items-center gap-3 mx-auto"
+                >
+                  <Download className="w-6 h-6" /> 下載 LINE 貼圖包
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

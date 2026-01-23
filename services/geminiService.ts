@@ -1,46 +1,22 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { CharacterConfig, StickerPrompt } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-const SCENARIO_LIST = [
-  { k: "打招呼", v: "Waving hand cheerfully with a big smile" },
-  { k: "謝謝", v: "Bowing deeply and holding a small red heart" },
-  { k: "OK", v: "Making an 'OK' sign with hands" },
-  { k: "大哭", v: "Crying with exaggerated waterfall-like tears" },
-  { k: "生氣", v: "Pouting with steam coming out of ears" },
-  { k: "趕工中", v: "Typing furiously on a laptop with a sweat drop" },
-  { k: "+1", v: "Holding a sign board that says '+1'" },
-  { k: "收到", v: "Giving a big thumbs up" },
-  { k: "大笑", v: "Rolling on the floor laughing" },
-  { k: "晚安", v: "Holding a soft pillow and yawning" }
-  // ... 其他情境可視需求擴充
-];
-
 /**
- * 劇本引擎：將角色設定轉化為 40 組 (或指定數量) 的生成指令
+ * 組合指令引擎：將角色設定與單一情境結合成圖像生成指令
+ * 依照使用者最新規範：強制使用純綠色背景 (RGB 0, 255, 0) 以利精準去背
  */
-export const generateScenarioPrompts = (character: CharacterConfig, scenarios = SCENARIO_LIST): StickerPrompt[] => {
-  const timestamp = Date.now();
-  const techKeywords = "Sticker style, isolated on white background, die-cut, white border, thick outlines, flat colors, no text, 2d illustration.";
-
-  return scenarios.map((item, index) => {
-    const visualDescription = `A ${character.style} ${character.species}, ${character.features}, wearing ${character.clothing}, ${item.v}. ${techKeywords}`;
-    
-    return {
-      id: `sticker-${timestamp}-${index}`,
-      keyword: item.k,
-      visualDescription: visualDescription,
-      status: 'pending'
-    };
-  });
+export const buildPrompt = (character: CharacterConfig, action: string): string => {
+  const techKeywords = "Sticker style, isolated on a solid bright green background (RGB 0, 255, 0), chroma key style, high contrast, no shadows on background, clean sharp edges, thick black outlines, flat colors, no text, 2d simple vector illustration, high quality, professional character design.";
+  return `A ${character.style} ${character.species}, ${character.features}, wearing ${character.clothing}, ${action}. ${techKeywords}`;
 };
 
 export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
   const ai = getAI();
   const contents: any = {
-    parts: [{ text: `${prompt}, high quality professional sticker.` }]
+    parts: [{ text: prompt }]
   };
 
   if (referenceImage) {
@@ -48,7 +24,7 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     contents.parts.unshift({
       inlineData: { data: base64Data, mimeType: 'image/png' }
     });
-    contents.parts.push({ text: "STRICT CONSISTENCY: Maintain exactly the same colors, features, and clothing as this reference character." });
+    contents.parts.push({ text: "Maintain strict visual consistency with this character's features, colors, and clothing. Ensure the character is placed against the pure green background." });
   }
 
   const response = await ai.models.generateContent({

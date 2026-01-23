@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { checkTransparency, removeWhiteBackground, formatStickerForLine } from '../utils/stickerUtils';
+import { smartFormat } from '../utils/StickerProcessor';
 
 export const useStickerProcessor = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -8,18 +8,9 @@ export const useStickerProcessor = () => {
   const processSticker = useCallback(async (base64: string) => {
     setIsProcessing(true);
     try {
-      // 1. 智慧影像過濾器
-      const hasAlpha = await checkTransparency(base64);
-      let workingBase64 = base64;
-
-      if (!hasAlpha) {
-        console.log("偵測到不透明背景，執行基礎色度去背...");
-        workingBase64 = await removeWhiteBackground(base64);
-      }
-
-      // 2. 自動規格校正器
-      const result = await formatStickerForLine(workingBase64);
-      return result;
+      // 調用整合後的智慧處理流水線
+      const dataUrl = await smartFormat(base64);
+      return { dataUrl };
     } catch (err) {
       console.error("處理貼圖失敗:", err);
       return null;
