@@ -3,15 +3,16 @@ import React, { useState, useMemo } from 'react';
 import { 
   Sparkles, Palette, Download, CheckCircle2, 
   Loader2, ImageIcon, Wand2, Layers, Dices, Info, ShieldCheck,
-  ChevronRight, Box, LayoutGrid, CheckSquare, ListOrdered, FileJson
+  ChevronRight, Box, LayoutGrid, CheckSquare, ListOrdered, FileJson, Type
 } from 'lucide-react';
 import JSZip from 'jszip';
-import { CharacterConfig, StickerPrompt } from './types';
+import { CharacterConfig, StickerPrompt, TextStyleConfig } from './types';
 import { buildPrompt, generateStickerImage } from './services/geminiService';
 import { useStickerProcessor } from './hooks/useStickerProcessor';
 import { getRandomPreset } from './animalPresets';
 import { stickerScenarios } from './utils/scenarios';
 import { autoDeriveLineAssets } from './utils/StickerProcessor';
+import { textStylePresets } from './utils/textStylePresets';
 
 export default function App() {
   const [step, setStep] = useState(1);
@@ -22,6 +23,7 @@ export default function App() {
     style: 'Q版比例 (Chibi)，粗輪廓線，平塗色塊'
   });
   
+  const [selectedTextStyle, setSelectedTextStyle] = useState<TextStyleConfig>(textStylePresets[0]);
   const [stickerCount, setStickerCount] = useState(8);
   const [prompts, setPrompts] = useState<StickerPrompt[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -52,16 +54,16 @@ export default function App() {
   const prepareProduction = () => {
     const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
       id: `stk-${Date.now()}-${index}`,
-      keyword: action.split(' ')[0],
+      keyword: action.split(' ')[0], // 取得劇本的第一個中文字詞
       visualDescription: buildPrompt(character, action),
       status: 'pending'
     }));
     setPrompts(initialPrompts);
-    setLineAssets({}); // 重置資產
+    setLineAssets({});
     setStep(2);
   };
 
-  // 單張生成邏輯
+  // 單張生成邏輯 (帶文字樣式)
   const generateOne = async (id: string, index: number) => {
     setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'generating' } : p));
     try {
@@ -69,7 +71,9 @@ export default function App() {
       if (!target) return null;
 
       const raw = await generateStickerImage(target.visualDescription, character.referenceImage);
-      const processed = await processSticker(raw);
+      
+      // 在處理時傳入劇本文字與選定的樣式
+      const processed = await processSticker(raw, target.keyword, selectedTextStyle);
       
       if (processed) {
         const updatedPrompt = { 
@@ -81,7 +85,6 @@ export default function App() {
         
         setPrompts(prev => prev.map(p => p.id === id ? updatedPrompt : p));
 
-        // 如果是第一張貼圖，自動產出 Main 與 Tab 資產
         if (index === 0) {
           const assets = await autoDeriveLineAssets(processed.dataUrl);
           setLineAssets(assets);
@@ -115,26 +118,18 @@ export default function App() {
     setGeneratingIndex(0);
   };
 
-  // 打包 ZIP 並下載
   const handleExportZip = async () => {
     const doneOnes = prompts.filter(p => p.status === 'done' && p.processedImage);
     if (doneOnes.length === 0) return alert("尚無已完成的貼圖可供下載");
     
     const zip = new JSZip();
-    
-    // 1. 加入貼圖本體 (01.png - XX.png)
     doneOnes.forEach((p, i) => {
       const b64 = p.processedImage!.split(',')[1];
       zip.file(`${String(i + 1).padStart(2, '0')}.png`, b64, { base64: true });
     });
 
-    // 2. 加入封面與標籤圖 (如果已生成)
-    if (lineAssets.main) {
-      zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
-    }
-    if (lineAssets.tab) {
-      zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
-    }
+    if (lineAssets.main) zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
+    if (lineAssets.tab) zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
 
     const content = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');
@@ -157,7 +152,7 @@ export default function App() {
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">
             <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            自動產出 Main/Tab 必要資產
+            自動文字描邊技術已啟用
           </div>
         </div>
       </nav>
@@ -214,36 +209,58 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* 文字樣式選擇區 */}
+                <div className="mt-8 pt-8 border-t border-slate-100">
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Type className="w-4 h-4" /> 選擇文字樣式 (15 種風格)
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                    {textStylePresets.map(style => (
+                      <button
+                        key={style.id}
+                        onClick={() => setSelectedTextStyle(style)}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${selectedTextStyle.id === style.id ? 'border-indigo-600 bg-indigo-50 ring-4 ring-indigo-100' : 'border-slate-100 hover:border-slate-200'}`}
+                      >
+                        <div 
+                          className="text-sm font-black text-center"
+                          style={{ 
+                            color: style.color, 
+                            textShadow: `0 0 ${style.strokeWidth}px ${style.strokeColor}` 
+                          }}
+                        >
+                          你好
+                        </div>
+                        <span className="text-[9px] font-bold text-slate-400 line-clamp-1">{style.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="mt-10">
                   <button 
                     onClick={handleEstablishCharacter}
                     disabled={isGenerating}
-                    className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-slate-200"
+                    className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                   >
                     {isGenerating ? <Loader2 className="animate-spin" /> : <Wand2 className="w-5 h-5" />}
-                    生成角色基準 (必備步驟)
+                    生成基準角色 (Chroma Key)
                   </button>
                 </div>
               </div>
 
               <div className="bg-indigo-600 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                  <LayoutGrid size={120} />
-                </div>
+                <div className="absolute top-0 right-0 p-8 opacity-10"><LayoutGrid size={120} /></div>
                 <div className="relative z-10">
-                  <h3 className="font-black text-3xl mb-2 flex items-center gap-3">
-                    <Box className="text-indigo-200" /> 批量生產配置
-                  </h3>
-                  <p className="text-indigo-100 text-sm mb-8 max-w-md">系統將自動利用第一張貼圖作為素材，為您產出 main.png 與 tab.png。</p>
+                  <h3 className="font-black text-3xl mb-2 flex items-center gap-3"><Box className="text-indigo-200" /> 批量生產配置</h3>
+                  <p className="text-indigo-100 text-sm mb-8 max-w-md">系統將自動疊加「{selectedTextStyle.name}」風格文字到貼圖上。</p>
                   
                   <div className="flex flex-col gap-4 mb-8">
                     <label className="text-[10px] font-black uppercase text-indigo-200 tracking-widest">選擇生成張數</label>
                     <div className="flex flex-wrap gap-3">
                       {[8, 16, 24, 32, 40].map(count => (
                         <button 
-                          key={count}
-                          onClick={() => setStickerCount(count)}
-                          className={`flex-1 min-w-[60px] py-4 rounded-2xl font-black transition-all ${stickerCount === count ? 'bg-white text-indigo-600 scale-105 shadow-lg ring-4 ring-white/20' : 'bg-indigo-500 text-indigo-100 hover:bg-indigo-400'}`}
+                          key={count} onClick={() => setStickerCount(count)}
+                          className={`flex-1 min-w-[60px] py-4 rounded-2xl font-black transition-all ${stickerCount === count ? 'bg-white text-indigo-600 scale-105 shadow-lg' : 'bg-indigo-500 text-indigo-100 hover:bg-indigo-400'}`}
                         >
                           {count}
                         </button>
@@ -267,7 +284,7 @@ export default function App() {
                 <h3 className="font-black text-slate-400 text-[10px] tracking-widest uppercase mb-6">基準角色預覽</h3>
                 {character.referenceImage ? (
                   <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200 aspect-square flex items-center justify-center overflow-hidden">
-                    <img src={character.referenceImage} className="max-w-full max-h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform" />
+                    <img src={character.referenceImage} className="max-w-full max-h-full object-contain drop-shadow-2xl" />
                   </div>
                 ) : (
                   <div className="aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300">
@@ -275,12 +292,6 @@ export default function App() {
                     <p className="text-[10px] font-black text-center px-8 uppercase">尚未建立基準</p>
                   </div>
                 )}
-                <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                  <div className="flex gap-2 text-[11px] text-indigo-600 font-bold leading-relaxed">
-                    <Info className="w-4 h-4 flex-shrink-0" />
-                    <div>基準角色建立後，批量產出的貼圖將具備高度視覺一致性。</div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -299,7 +310,7 @@ export default function App() {
                 </h2>
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex items-center gap-1.5 text-indigo-500 font-black text-sm">
-                    <ShieldCheck className="w-4 h-4" /> 智慧校正與資產派生已就緒
+                    <ShieldCheck className="w-4 h-4" /> 智慧加字與綠幕去背中
                   </div>
                 </div>
               </div>
@@ -311,44 +322,16 @@ export default function App() {
                   className="bg-indigo-600 text-white px-8 py-5 rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center gap-3 hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {isBatchGenerating ? <Loader2 className="animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                  啟動批量生成
+                  啟動全套生產
                 </button>
                 <button 
                   onClick={handleExportZip}
                   className="bg-slate-900 text-white px-8 py-5 rounded-2xl font-black shadow-xl flex items-center gap-3 hover:bg-slate-800"
                 >
-                  <Download className="w-5 h-5" /> 打包下載 ZIP
+                  <Download className="w-5 h-5" /> 下載 ZIP 貼圖包
                 </button>
               </div>
             </div>
-
-            {/* 必要資產預覽區 (Main / Tab) */}
-            {(lineAssets.main || lineAssets.tab) && (
-              <div className="mb-10 bg-white border border-indigo-100 p-8 rounded-[2.5rem] shadow-sm animate-in fade-in duration-500">
-                <h3 className="font-black text-indigo-600 text-sm flex items-center gap-2 mb-6 uppercase tracking-wider">
-                  <FileJson className="w-4 h-4" /> LINE 系統必要資產 (已自動派生)
-                </h3>
-                <div className="flex flex-wrap gap-8">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main (240x240)</label>
-                    <div className="w-32 h-32 bg-slate-50 rounded-2xl border-2 border-dashed border-indigo-100 flex items-center justify-center p-4">
-                      {lineAssets.main ? <img src={lineAssets.main} className="max-w-full max-h-full object-contain" /> : <Loader2 className="animate-spin text-indigo-200" />}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tab (96x74)</label>
-                    <div className="w-32 h-32 bg-slate-50 rounded-2xl border-2 border-dashed border-indigo-100 flex items-center justify-center p-4">
-                      {lineAssets.tab ? <img src={lineAssets.tab} className="w-[96px] h-[74px] object-contain" /> : <Loader2 className="animate-spin text-indigo-200" />}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-[200px] flex items-center">
-                    <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] text-indigo-600 font-bold border border-indigo-100">
-                      系統已自動擷取「01.打招呼」作為主視覺素材，並依照 LINE 官方比例自動縮放。
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* 進度顯示條 */}
             {isBatchGenerating && (
@@ -356,7 +339,7 @@ export default function App() {
                 <div className="flex justify-between items-end mb-4">
                   <div className="font-black text-indigo-600 flex items-center gap-3 text-lg">
                     <Loader2 className="w-6 h-6 animate-spin" />
-                    正在處理：{prompts[generatingIndex - 1]?.keyword || '準備中'}
+                    正在處理「{prompts[generatingIndex - 1]?.keyword}」貼圖文字...
                   </div>
                   <div className="text-sm font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
                     第 {generatingIndex} / {prompts.length} 張
@@ -379,7 +362,7 @@ export default function App() {
                   </div>
                   <div className="aspect-square bg-slate-50 rounded-2xl mb-4 overflow-hidden relative border border-slate-100">
                     {p.status === 'done' ? (
-                      <div className="w-full h-full p-4 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-200/20">
+                      <div className="w-full h-full p-2 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-200/20">
                         <img src={p.processedImage} className="w-full h-full object-contain drop-shadow-xl" alt={p.keyword} />
                         <div className="absolute top-2 right-2 bg-emerald-500 rounded-full p-1 text-white shadow-lg animate-in zoom-in duration-300">
                           <CheckCircle2 className="w-4 h-4" />
@@ -388,12 +371,7 @@ export default function App() {
                     ) : p.status === 'generating' ? (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50/50">
                         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-tighter">AI 繪圖 & 校正</span>
-                      </div>
-                    ) : p.status === 'error' ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
-                        <Info className="w-6 h-6 text-red-400 mb-2" />
-                        <span className="text-[10px] font-black text-red-400">生成錯誤</span>
+                        <span className="text-[10px] font-black text-indigo-400 mt-2 uppercase tracking-tighter text-center px-4">AI 生成中...</span>
                       </div>
                     ) : (
                       <button 
@@ -415,17 +393,15 @@ export default function App() {
             </div>
 
             {isAllDone && (
-              <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto shadow-xl shadow-emerald-50 animate-in slide-in-from-top-4 duration-500">
-                <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-200">
-                  <CheckSquare size={40} />
-                </div>
-                <h3 className="text-2xl font-black text-emerald-900 mb-2">全套貼圖已完成！</h3>
-                <p className="text-emerald-700 font-bold mb-8">包含 main.png, tab.png 與 {prompts.length} 組貼圖本體，皆已符合官方規範。</p>
+              <div className="mt-16 bg-emerald-50 border border-emerald-100 p-10 rounded-[3rem] text-center max-w-2xl mx-auto shadow-xl">
+                <div className="inline-flex bg-emerald-500 text-white p-4 rounded-3xl mb-6 shadow-xl shadow-emerald-200"><CheckSquare size={40} /></div>
+                <h3 className="text-2xl font-black text-emerald-900 mb-2">自動化打包完成！</h3>
+                <p className="text-emerald-700 font-bold mb-8">所有圖片均已疊加「{selectedTextStyle.name}」文字，且符合 LINE 偶數尺寸規範。</p>
                 <button 
                   onClick={handleExportZip}
                   className="bg-emerald-600 text-white px-10 py-5 rounded-2xl font-black shadow-xl hover:bg-emerald-700 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
                 >
-                  <Download className="w-6 h-6" /> 下載 LINE 貼圖包 (ZIP)
+                  <Download className="w-6 h-6" /> 下載全套 LINE 貼圖
                 </button>
               </div>
             )}

@@ -1,4 +1,6 @@
 
+import { TextStyleConfig } from '../types';
+
 /**
  * LINE 貼圖規格工具組 - 專業資產產出版
  */
@@ -68,6 +70,61 @@ export const removeGreenBackground = (imageSrc: string): Promise<string> => {
     };
     img.onerror = (err) => reject(err);
     img.src = imageSrc;
+  });
+};
+
+/**
+ * 文字疊加工具：在圖片下方添加超大描邊文字，並具備寬度檢查功能
+ */
+export const addTextToImage = (base64: string, text: string, style: TextStyleConfig): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject("Context error");
+
+      ctx.drawImage(img, 0, 0);
+
+      // 設定初始大字體 (約圖片寬度的 1/3.5)
+      let fontSize = Math.floor(img.width / 3.5);
+      const maxWidth = img.width * 0.92; // 預留邊距
+      
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      // 動態縮放邏輯：如果文字太寬，自動縮小字體直到符合寬度
+      const adjustFont = () => {
+        ctx.font = `900 ${fontSize}px ${style.fontFamily}`;
+        const metrics = ctx.measureText(text);
+        if (metrics.width > maxWidth && fontSize > 20) {
+          fontSize -= 2;
+          adjustFont();
+        }
+      };
+      
+      adjustFont();
+
+      const x = img.width / 2;
+      const y = img.height - (img.height * 0.03); // 略微貼近底部
+
+      // 1. 先繪製描邊 (Stroke)
+      ctx.strokeStyle = style.strokeColor;
+      ctx.lineWidth = style.strokeWidth * (img.width / 300); 
+      ctx.lineJoin = 'round';
+      ctx.strokeText(text, x, y);
+
+      // 2. 再繪製填色 (Fill)
+      ctx.fillStyle = style.color;
+      ctx.fillText(text, x, y);
+
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject("Image load error for text");
+    img.src = base64;
   });
 };
 
@@ -150,7 +207,6 @@ export const formatStickerForLine = async (
 
 /**
  * 產出固定尺寸資產 (Main: 240x240, Tab: 96x74)
- * 確保 Object-fit: contain 效果並置中
  */
 export const createFixedSizeAsset = (base64: string, targetW: number, targetH: number): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -163,10 +219,8 @@ export const createFixedSizeAsset = (base64: string, targetW: number, targetH: n
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject("Canvas context error");
 
-      // 清除背景 (確保透明)
       ctx.clearRect(0, 0, targetW, targetH);
 
-      // 計算 contain 縮放比例
       const ratio = Math.min(targetW / img.width, targetH / img.height);
       const drawW = img.width * ratio;
       const drawH = img.height * ratio;

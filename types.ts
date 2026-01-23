@@ -7,6 +7,15 @@ export interface CharacterConfig {
   referenceImage?: string; // For consistency
 }
 
+export interface TextStyleConfig {
+  id: string;
+  name: string;
+  fontFamily: string;
+  color: string;
+  strokeColor: string;
+  strokeWidth: number;
+}
+
 export interface StickerPrompt {
   id: string;
   keyword: string;
