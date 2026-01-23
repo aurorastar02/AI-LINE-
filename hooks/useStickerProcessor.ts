@@ -9,9 +9,8 @@ export const useStickerProcessor = () => {
   const processSticker = useCallback(async (base64: string, text?: string, textStyle?: TextStyleConfig) => {
     setIsProcessing(true);
     try {
-      // 調用整合後的智慧處理流水線，加入文字處理
-      const dataUrl = await smartFormat(base64, text, textStyle);
-      return { dataUrl };
+      const { sticker, cleanSource } = await smartFormat(base64, text, textStyle);
+      return { dataUrl: sticker, cleanSource };
     } catch (err) {
       console.error("處理貼圖失敗:", err);
       return null;

@@ -2,43 +2,41 @@
 import { TextStyleConfig } from '../types';
 
 /**
- * LINE 貼圖規格工具組 - 專業資產產出版
+ * 檢查圖片是否已經具備透明背景
  */
-
-/**
- * 檢查圖片是否包含透明像素
- */
-export const checkTransparency = (imageSrc: string): Promise<boolean> => {
-  return new Promise((resolve, reject) => {
+export const isImageTransparent = (imageSrc: string): Promise<boolean> => {
+  return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) return reject('無法建立 Canvas Context');
-
+      if (!ctx) { resolve(false); return; }
+      
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] < 250) {
-          resolve(true); 
-          return;
-        }
-      }
-      resolve(false);
+      
+      const points = [
+        [0, 0], [img.width - 1, 0], 
+        [0, img.height - 1], [img.width - 1, img.height - 1],
+        [Math.floor(img.width / 2), 0]
+      ];
+      
+      const isTransparent = points.some(([x, y]) => {
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        return pixel[3] < 200; 
+      });
+      
+      resolve(isTransparent);
     };
-    img.onerror = (err) => reject(err);
+    img.onerror = () => resolve(false);
     img.src = imageSrc;
   });
 };
 
 /**
- * 綠幕去背工具：將純綠色背景轉為透明 (Chroma Key)
+ * 綠幕去背工具
  */
 export const removeGreenBackground = (imageSrc: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -60,7 +58,7 @@ export const removeGreenBackground = (imageSrc: string): Promise<string> => {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        if (g > 150 && g > r * 1.4 && g > b * 1.4) {
+        if (g > 140 && g > r * 1.3 && g > b * 1.3) {
           data[i + 3] = 0; 
         }
       }
@@ -74,7 +72,8 @@ export const removeGreenBackground = (imageSrc: string): Promise<string> => {
 };
 
 /**
- * 文字疊加工具：在圖片下方添加超大描邊文字，並具備寬度檢查功能
+ * 核心文字疊加引擎：支援自動縮放以符合畫布寬度
+ * 適用於貼圖本體、Main.png 與 Tab.png
  */
 export const addTextToImage = (base64: string, text: string, style: TextStyleConfig): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -89,47 +88,54 @@ export const addTextToImage = (base64: string, text: string, style: TextStyleCon
 
       ctx.drawImage(img, 0, 0);
 
-      // 設定初始大字體 (約圖片寬度的 1/3.5)
-      let fontSize = Math.floor(img.width / 3.5);
-      const maxWidth = img.width * 0.92; // 預留邊距
+      // 設定字體：優先使用使用者選取的字體系列，並強制加粗以求可愛與清晰
+      const fontName = style.fontFamily === 'cursive' ? '"Arial Rounded MT Bold", cursive' : style.fontFamily;
+      
+      // 根據畫布寬度計算初始字級 (大約寬度的 1/3)
+      let fontSize = Math.floor(canvas.width / 3.2);
+      // 針對極小尺寸 (如 Tab 96px) 調整最小比例
+      if (canvas.width < 100) fontSize = Math.floor(canvas.width / 2.5);
+
+      const padding = canvas.width * 0.08; 
+      const maxWidth = canvas.width - padding;
       
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       
-      // 動態縮放邏輯：如果文字太寬，自動縮小字體直到符合寬度
-      const adjustFont = () => {
-        ctx.font = `900 ${fontSize}px ${style.fontFamily}`;
+      // 自適應縮放迴圈
+      const applyStyle = () => {
+        ctx.font = `900 ${fontSize}px ${fontName}`;
         const metrics = ctx.measureText(text);
-        if (metrics.width > maxWidth && fontSize > 20) {
-          fontSize -= 2;
-          adjustFont();
+        if (metrics.width > maxWidth && fontSize > 10) {
+          fontSize -= 1;
+          applyStyle();
         }
       };
       
-      adjustFont();
+      applyStyle();
 
-      const x = img.width / 2;
-      const y = img.height - (img.height * 0.03); // 略微貼近底部
+      const x = canvas.width / 2;
+      const y = canvas.height - (canvas.height * 0.03);
 
-      // 1. 先繪製描邊 (Stroke)
+      // 1. 繪製描邊 (固定白色描邊或選定描邊)
       ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.strokeWidth * (img.width / 300); 
+      ctx.lineWidth = Math.max(2, style.strokeWidth * (canvas.width / 300)); 
       ctx.lineJoin = 'round';
       ctx.strokeText(text, x, y);
 
-      // 2. 再繪製填色 (Fill)
+      // 2. 繪製填色
       ctx.fillStyle = style.color;
       ctx.fillText(text, x, y);
 
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => reject("Image load error for text");
+    img.onerror = () => reject("Text overlay failed");
     img.src = base64;
   });
 };
 
 /**
- * 自動規格校正器：處理貼圖本體 (01.png - 40.png)
+ * 產出符合 LINE 偶數尺寸規範的資產 (透明背景)
  */
 export const formatStickerForLine = async (
   base64: string,
@@ -178,6 +184,7 @@ export const formatStickerForLine = async (
       let finalW = Math.floor(targetW * ratio);
       let finalH = Math.floor(targetH * ratio);
 
+      // 強制偶數尺寸 (LINE 規範)
       if (finalW % 2 !== 0) finalW -= 1;
       if (finalH % 2 !== 0) finalH -= 1;
 
@@ -206,13 +213,19 @@ export const formatStickerForLine = async (
 };
 
 /**
- * 產出固定尺寸資產 (Main: 240x240, Tab: 96x74)
+ * 產出固定尺寸並疊加標題文字的資產 (用於 Main/Tab)
  */
-export const createFixedSizeAsset = (base64: string, targetW: number, targetH: number): Promise<string> => {
+export const createFixedSizeAssetWithText = async (
+  base64: string, 
+  targetW: number, 
+  targetH: number, 
+  text: string, 
+  style: TextStyleConfig
+): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = document.createElement('canvas');
       canvas.width = targetW;
       canvas.height = targetH;
@@ -228,7 +241,10 @@ export const createFixedSizeAsset = (base64: string, targetW: number, targetH: n
       const y = (targetH - drawH) / 2;
 
       ctx.drawImage(img, x, y, drawW, drawH);
-      resolve(canvas.toDataURL('image/png'));
+      
+      // 在固定尺寸畫布上疊加文字
+      const withText = await addTextToImage(canvas.toDataURL('image/png'), text, style);
+      resolve(withText);
     };
     img.onerror = () => reject("Asset creation error");
     img.src = base64;
