@@ -4,14 +4,23 @@ import { CharacterConfig, GenerationMode } from "../types";
 
 /**
  * 動態獲取 API Key
- * 優先序：localStorage > process.env.API_KEY
+ * 優先序：localStorage (非空) > process.env.API_KEY
  */
-const getApiKey = () => {
+export const getActiveApiKey = () => {
   const manualKey = localStorage.getItem('user_gemini_api_key');
-  return manualKey || process.env.API_KEY || '';
+  if (manualKey && manualKey.trim() !== '') {
+    return { key: manualKey.trim(), source: 'manual' as const };
+  }
+  return { key: process.env.API_KEY || '', source: 'system' as const };
 };
 
-const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
+/**
+ * 內部使用的初始化方法，確保每次呼叫都是最新的 Key
+ */
+const getAIClient = () => {
+  const { key } = getActiveApiKey();
+  return new GoogleGenAI({ apiKey: key });
+};
 
 /**
  * 組合指令引擎：根據模式切換風格
@@ -30,8 +39,7 @@ export const buildPrompt = (character: CharacterConfig, action: string, mode: Ge
 };
 
 export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
-  // 每次呼叫都重新初始化以確保使用最新的 Key
-  const ai = getAI();
+  const ai = getAIClient();
   const contents: any = {
     parts: [{ text: prompt }]
   };
@@ -56,8 +64,13 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     
     return `data:image/png;base64,${part.inlineData.data}`;
   } catch (error: any) {
-    if (error.message?.includes("API key not valid")) {
+    const errorMsg = error.message || "";
+    // 強化錯誤判定邏輯
+    if (errorMsg.includes("API key not valid") || errorMsg.includes("401")) {
       throw new Error("API_KEY_INVALID");
+    }
+    if (errorMsg.includes("quota") || errorMsg.includes("429") || errorMsg.includes("limit")) {
+      throw new Error("QUOTA_EXCEEDED");
     }
     throw error;
   }
