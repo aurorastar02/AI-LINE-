@@ -2,7 +2,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { CharacterConfig, GenerationMode } from "../types";
 
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+/**
+ * 動態獲取 API Key
+ * 優先序：localStorage > process.env.API_KEY
+ */
+const getApiKey = () => {
+  const manualKey = localStorage.getItem('user_gemini_api_key');
+  return manualKey || process.env.API_KEY || '';
+};
+
+const getAI = () => new GoogleGenAI({ apiKey: getApiKey() });
 
 /**
  * 組合指令引擎：根據模式切換風格
@@ -12,10 +21,8 @@ export const buildPrompt = (character: CharacterConfig, action: string, mode: Ge
   
   let stylePrompt = "";
   if (mode === 'fine') {
-    // 模式 A：精緻 Q 版
     stylePrompt = "high quality, professional character design, clean sharp edges, thick black outlines, flat colors, perfect symmetry, cute and polished appearance.";
   } else {
-    // 模式 B：抽象搞笑實驗室
     stylePrompt = "ugly-cute style, intentionally messy doodles, shaky brushstrokes, distorted facial features, asymmetric eyes, weirdly proportioned body, surreal humor, crayon texture, rough marker lines, chaotic coloring, over-the-top exaggerated expressions, derpy face, low-brow art style.";
   }
 
@@ -23,6 +30,7 @@ export const buildPrompt = (character: CharacterConfig, action: string, mode: Ge
 };
 
 export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
+  // 每次呼叫都重新初始化以確保使用最新的 Key
   const ai = getAI();
   const contents: any = {
     parts: [{ text: prompt }]
@@ -36,14 +44,21 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     contents.parts.push({ text: "Maintain strict visual consistency with this character's identity while applying the specified art style. Ensure the background remains pure green (RGB 0,255,0)." });
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents,
-    config: { imageConfig: { aspectRatio: "1:1" } }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents,
+      config: { imageConfig: { aspectRatio: "1:1" } }
+    });
 
-  const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-  if (!part || !part.inlineData) throw new Error("Image generation failed");
-  
-  return `data:image/png;base64,${part.inlineData.data}`;
+    const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+    if (!part || !part.inlineData) throw new Error("Image generation failed");
+    
+    return `data:image/png;base64,${part.inlineData.data}`;
+  } catch (error: any) {
+    if (error.message?.includes("API key not valid")) {
+      throw new Error("API_KEY_INVALID");
+    }
+    throw error;
+  }
 };
