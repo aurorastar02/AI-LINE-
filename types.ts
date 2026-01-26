@@ -1,4 +1,6 @@
 
+export type GenerationMode = 'fine' | 'abstract';
+
 export interface CharacterConfig {
   species: string;
   features: string;
