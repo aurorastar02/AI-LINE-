@@ -121,6 +121,7 @@ export default function App() {
         
         setPrompts(prev => prev.map(p => p.id === id ? updatedPrompt : p));
 
+        // 如果是第一張貼圖，自動產出系統圖 (Main & Tab)
         if (index === 0 && processed.cleanSource) {
           const assets = await autoDeriveLineAssets(processed.cleanSource, stickerTitle, selectedTextStyle);
           setLineAssets(assets);
@@ -161,9 +162,13 @@ export default function App() {
       zip.file(`${String(i + 1).padStart(2, '0')}.png`, b64, { base64: true });
     });
 
-    // 由 Canvas 產出的系統必要資產
-    if (lineAssets.main) zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
-    if (lineAssets.tab) zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
+    // 系統圖資產 (main.png, tab.png)
+    if (lineAssets.main) {
+      zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
+    }
+    if (lineAssets.tab) {
+      zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
+    }
 
     const content = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');

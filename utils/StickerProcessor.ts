@@ -14,16 +14,20 @@ import {
  */
 export const smartFormat = async (base64: string, text?: string, textStyle?: TextStyleConfig) => {
   try {
+    console.log("Starting Smart Format...");
+    
     // 1. 透明度檢查
     const alreadyTransparent = await isImageTransparent(base64);
     let workingImg = base64;
     
     // 2. 綠幕去背
     if (!alreadyTransparent) {
+      console.log("Detected background, removing green...");
       workingImg = await removeGreenBackground(base64);
     }
 
-    // 3. 規格化第一階段：先裁切出乾淨的透明底圖 (不含字)
+    // 3. 規格化第一階段：裁切透明底圖
+    console.log("Normalizing for LINE specs...");
     const cleanResult = await formatStickerForLine(workingImg, {
       maxW: 370,
       maxH: 320,
@@ -31,31 +35,37 @@ export const smartFormat = async (base64: string, text?: string, textStyle?: Tex
     });
     const cleanSource = cleanResult.dataUrl;
 
-    // 4. 文字疊加：在裁切好的底圖上疊加文字
+    // 4. 文字疊加
     let sticker = cleanSource;
     if (text && textStyle) {
-      const img = new Image();
-      img.src = cleanSource;
-      await new Promise(r => img.onload = r);
-      
+      console.log("Adding text overlay:", text);
       const canvas = document.createElement('canvas');
       canvas.width = cleanResult.width;
       canvas.height = cleanResult.height;
       const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0);
-      sticker = addTextToImage(canvas, text, textStyle);
+      if (ctx) {
+        // 等待底圖載入完成再畫
+        const img = new Image();
+        img.src = cleanSource;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        ctx.drawImage(img, 0, 0);
+        sticker = addTextToImage(canvas, text, textStyle);
+      }
     }
 
+    console.log("Smart Format Complete.");
     return { sticker, cleanSource };
   } catch (error) {
-    console.error("Smart Format Error:", error);
+    console.error("Smart Format Pipeline Crashed:", error);
     throw error;
   }
 };
 
 /**
- * 自動產出 LINE 系統必要資產 (Main: 240x240, Tab: 96x74)
- * 使用優化後的 formatLineAssets 進行本地生成，停止依賴 API
+ * 自動產出 LINE 系統必要資產
  */
 export const autoDeriveLineAssets = async (cleanSourceDataUrl: string, title: string, style: TextStyleConfig) => {
   try {
