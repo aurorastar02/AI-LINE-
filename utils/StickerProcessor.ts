@@ -4,7 +4,7 @@ import {
   isImageTransparent, 
   removeGreenBackground, 
   formatStickerForLine, 
-  createFixedSizeAssetWithText, 
+  formatLineAssets, 
   addTextToImage 
 } from './stickerUtils';
 
@@ -34,7 +34,16 @@ export const smartFormat = async (base64: string, text?: string, textStyle?: Tex
     // 4. 文字疊加：在裁切好的底圖上疊加文字
     let sticker = cleanSource;
     if (text && textStyle) {
-      sticker = await addTextToImage(cleanSource, text, textStyle);
+      const img = new Image();
+      img.src = cleanSource;
+      await new Promise(r => img.onload = r);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = cleanResult.width;
+      canvas.height = cleanResult.height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0);
+      sticker = addTextToImage(canvas, text, textStyle);
     }
 
     return { sticker, cleanSource };
@@ -46,15 +55,11 @@ export const smartFormat = async (base64: string, text?: string, textStyle?: Tex
 
 /**
  * 自動產出 LINE 系統必要資產 (Main: 240x240, Tab: 96x74)
- * @param cleanSourceDataUrl 去背後的乾淨底圖 (不含劇本文字)
- * @param title 貼圖系列名稱
- * @param style 選定的文字樣式
+ * 使用優化後的 formatLineAssets 進行本地生成，停止依賴 API
  */
 export const autoDeriveLineAssets = async (cleanSourceDataUrl: string, title: string, style: TextStyleConfig) => {
   try {
-    const main = await createFixedSizeAssetWithText(cleanSourceDataUrl, 240, 240, title, style);
-    const tab = await createFixedSizeAssetWithText(cleanSourceDataUrl, 96, 74, title, style);
-    return { main, tab };
+    return await formatLineAssets(cleanSourceDataUrl, title, style);
   } catch (error) {
     console.error("Auto Derive Assets Error:", error);
     throw error;

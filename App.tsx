@@ -24,7 +24,6 @@ export default function App() {
   const [apiKeyInput, setApiKeyInput] = useState(localStorage.getItem('user_gemini_api_key') || '');
   const [keyNotification, setKeyNotification] = useState<{message: string, type: 'success'|'error'} | null>(null);
 
-  // 動態獲取目前生效的金鑰狀態 (用於 UI 顯示)
   const activeKeyInfo = useMemo(() => getActiveApiKey(), [apiKeyInput, showKeyConfig]);
 
   const [character, setCharacter] = useState<CharacterConfig>({
@@ -45,7 +44,6 @@ export default function App() {
   
   const { processSticker } = useStickerProcessor();
 
-  // 儲存金鑰至 localStorage
   const handleSaveKey = () => {
     if (!apiKeyInput.trim()) return handleClearKey();
     localStorage.setItem('user_gemini_api_key', apiKeyInput.trim());
@@ -56,7 +54,6 @@ export default function App() {
     }, 2000);
   };
 
-  // 清除金鑰
   const handleClearKey = () => {
     localStorage.removeItem('user_gemini_api_key');
     setApiKeyInput('');
@@ -64,7 +61,6 @@ export default function App() {
     setTimeout(() => setKeyNotification(null), 2000);
   };
 
-  // 建立基準角色
   const handleEstablishCharacter = async () => {
     setIsGenerating(true);
     try {
@@ -81,7 +77,6 @@ export default function App() {
     }
   };
 
-  // 統一處理 API 錯誤並引導 UI
   const handleApiError = (error: any) => {
     if (error.message === "API_KEY_INVALID") {
       setKeyNotification({ message: '偵測到無效金鑰，請檢查並重新輸入。', type: 'error' });
@@ -95,7 +90,6 @@ export default function App() {
     setIsBatchGenerating(false);
   };
 
-  // 進入生產介面
   const prepareProduction = () => {
     const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
       id: `stk-${Date.now()}-${index}`,
@@ -108,7 +102,6 @@ export default function App() {
     setStep(2);
   };
 
-  // 單張生成邏輯
   const generateOne = async (id: string, index: number) => {
     setPrompts(prev => prev.map(p => p.id === id ? { ...p, status: 'generating' } : p));
     try {
@@ -151,7 +144,6 @@ export default function App() {
       setGeneratingIndex(count);
       const res = await generateOne(item.p.id, item.idx);
       if (!res) break; 
-      // 延遲以符合免費版頻率限制
       await new Promise(r => setTimeout(r, 2000));
     }
     setIsBatchGenerating(false);
@@ -162,12 +154,17 @@ export default function App() {
     const doneOnes = prompts.filter(p => p.status === 'done' && p.processedImage);
     if (doneOnes.length === 0) return alert("尚無已完成的貼圖可供下載");
     const zip = new JSZip();
+    
+    // 貼圖本體 (01.png, 02.png...)
     doneOnes.forEach((p, i) => {
       const b64 = p.processedImage!.split(',')[1];
       zip.file(`${String(i + 1).padStart(2, '0')}.png`, b64, { base64: true });
     });
+
+    // 由 Canvas 產出的系統必要資產
     if (lineAssets.main) zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
     if (lineAssets.tab) zip.file(`tab.png`, lineAssets.tab.split(',')[1], { base64: true });
+
     const content = await zip.generateAsync({ type: 'blob' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(content);
@@ -200,7 +197,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* API Key Configuration Dropdown */}
       {showKeyConfig && (
         <div className="sticky top-16 z-40 bg-white border-b shadow-2xl p-6 animate-in slide-in-from-top duration-300">
           <div className="max-w-4xl mx-auto">
@@ -434,11 +430,6 @@ export default function App() {
                     <p className="text-[11px] font-black text-center px-10 uppercase tracking-widest leading-loose">請先點擊左側<br/>建立基準按鈕</p>
                   </div>
                 )}
-                {character.referenceImage && (
-                   <div className={`mt-6 text-center text-[10px] font-black uppercase tracking-widest py-3 rounded-xl shadow-sm ${generationMode === 'fine' ? 'text-indigo-500 bg-indigo-50 border border-indigo-100' : 'text-amber-600 bg-amber-50 border border-amber-100'}`}>
-                     鎖定：{generationMode === 'fine' ? '精緻模式' : '實驗模式'}
-                   </div>
-                )}
               </div>
             </div>
           </div>
@@ -475,7 +466,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 必要資產預覽區 (Main / Tab) */}
             {(lineAssets.main || lineAssets.tab) && (
               <div className="mb-14 bg-white border border-indigo-100 p-10 rounded-[3rem] shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
@@ -564,7 +554,6 @@ export default function App() {
         )}
       </main>
       
-      {/* 底部裝飾 */}
       <footer className="mt-20 py-10 border-t bg-white text-center">
         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Powered by Gemini 2.5 & Imagen Pro</p>
       </footer>
