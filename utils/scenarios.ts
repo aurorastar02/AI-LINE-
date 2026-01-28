@@ -1,4 +1,5 @@
 
+// 經典日常劇本 (適合精緻模式)
 export const stickerScenarios = [
   "嗨嗨 (Waving hello)",
   "謝啦 (Bowing and saying thank you)",
@@ -40,4 +41,31 @@ export const stickerScenarios = [
   "優雅 (Sipping coffee elegantly)",
   "跪求 (Prostrating in formal apology)",
   "偷看 (Peeking from behind a corner)"
+];
+
+// 魔性崩壞專用劇本 (實驗室、身體變形、抽象幽默)
+export const abstractScenarios = [
+  // 實驗室日常與失敗
+  "炸了! (Shock): Holding a test tube that explodes violently with purple smoke. Face is hilariously distorted, eyes popping out cartoonishly.",
+  "怪東西 (Weird): Stirring a bubbling green sludge in a beaker. A weird alien tentacle emerges from the sludge. Looking disgusted and terrified.",
+  "焦了 (Burnt out): After an electric shock. Fur is standing straight up, covered in soot, smoke coming out of ears. Blank, stunned expression.",
+  "融化 (Melting): Literally melting into a puddle of orange goo on the lab floor, only eyes remain. Caption 'I'm done'.",
+  "卡住 (Stuck): Head stuck inside a large glass flask. Muffled, panicked expression.",
+  "嘿嘿 (Mad Scientist): Laughing maniacally while holding two glowing potions, glasses reflecting chaotic light. Drool coming out of mouth.",
+  "崩潰 (Frustrated): Scribbling furiously on a clipboard, then slamming it on the ground. Chalk dust everywhere.",
+  
+  // 抽象與身體變形
+  "昇華 (Soul leaving): Standing still while a translucent, ghostly version of itself floats out of its mouth.",
+  "位移 (Derpy): Face rearranged cubism style. One eye is on the cheek, mouth is on the forehead. Looking very confused.",
+  "拉長 (Stretched): Body is impossibly stretched out long like a noodle across the lab table.",
+  "幾何 (Geometric): Turned into a pile of abstract geometric shapes (cubes and spheres) with its original patterns.",
+  "爆載 (Overload): Top of the head opens up like a lid, smoke and gears pop out. Eyes swirling.",
+  "驚呆 (Jaw Drop): Jaw drops all the way to the floor, tongue rolls out like a red carpet. Eyes bulging enormously.",
+  
+  // 搞怪社交互動
+  "可以吧 (Doubtful OK): Giving an OK hand sign, but the hand is shaking uncontrollably, and sweat drops are flying.",
+  "閃亮登場 (Hi/Appearance): Emerging dramatically from a cloud of pink explosion smoke, waving awkwardly.",
+  "沒人 (Hiding/No): Only its butt and tail are sticking out from under a lab table. Trembling.",
+  "救命 (Help): Being chased by a giant mutated bouncy ball with teeth. Running desperately.",
+  "觀察中 (Staring): Looking through a giant magnifying glass, the eye is magnified 10 times larger, looking intensely weird."
 ];

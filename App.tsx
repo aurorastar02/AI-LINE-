@@ -11,7 +11,7 @@ import { CharacterConfig, StickerPrompt, TextStyleConfig, GenerationMode } from 
 import { buildPrompt, generateStickerImage, getActiveApiKey } from './services/geminiService';
 import { useStickerProcessor } from './hooks/useStickerProcessor';
 import { getRandomPreset } from './animalPresets';
-import { stickerScenarios } from './utils/scenarios';
+import { stickerScenarios, abstractScenarios } from './utils/scenarios';
 import { autoDeriveLineAssets } from './utils/StickerProcessor';
 import { textStylePresets } from './utils/textStylePresets';
 
@@ -91,12 +91,24 @@ export default function App() {
   };
 
   const prepareProduction = () => {
-    const initialPrompts: StickerPrompt[] = stickerScenarios.slice(0, stickerCount).map((action, index) => ({
+    // 根據模式選擇劇本庫
+    let pool = generationMode === 'abstract' ? [...abstractScenarios] : [...stickerScenarios];
+    
+    // 如果魔性模式需要生成的數量超過劇本數，混合經典劇本
+    if (generationMode === 'abstract' && stickerCount > abstractScenarios.length) {
+      pool = [...pool, ...stickerScenarios];
+    }
+
+    // 隨機洗牌劇本庫
+    const shuffledPool = pool.sort(() => Math.random() - 0.5);
+    
+    const initialPrompts: StickerPrompt[] = shuffledPool.slice(0, stickerCount).map((action, index) => ({
       id: `stk-${Date.now()}-${index}`,
       keyword: action.split(' ')[0], 
       visualDescription: buildPrompt(character, action, generationMode),
       status: 'pending'
     }));
+    
     setPrompts(initialPrompts);
     setLineAssets({});
     setStep(2);
@@ -121,7 +133,6 @@ export default function App() {
         
         setPrompts(prev => prev.map(p => p.id === id ? updatedPrompt : p));
 
-        // 如果是第一張貼圖，自動產出系統圖 (Main & Tab)
         if (index === 0 && processed.cleanSource) {
           const assets = await autoDeriveLineAssets(processed.cleanSource, stickerTitle, selectedTextStyle);
           setLineAssets(assets);
@@ -156,13 +167,11 @@ export default function App() {
     if (doneOnes.length === 0) return alert("尚無已完成的貼圖可供下載");
     const zip = new JSZip();
     
-    // 貼圖本體 (01.png, 02.png...)
     doneOnes.forEach((p, i) => {
       const b64 = p.processedImage!.split(',')[1];
       zip.file(`${String(i + 1).padStart(2, '0')}.png`, b64, { base64: true });
     });
 
-    // 系統圖資產 (main.png, tab.png)
     if (lineAssets.main) {
       zip.file(`main.png`, lineAssets.main.split(',')[1], { base64: true });
     }
@@ -531,7 +540,7 @@ export default function App() {
                   </div>
                   <div className="px-2 text-center">
                     <div className="font-black text-lg text-slate-800 truncate mb-1">{p.keyword}</div>
-                    <div className="text-[10px] text-slate-400 font-bold leading-relaxed line-clamp-1 opacity-60 italic">{stickerScenarios[idx]}</div>
+                    <div className="text-[10px] text-slate-400 font-bold leading-relaxed line-clamp-1 opacity-60 italic">{p.visualDescription.split('. ')[0]}</div>
                   </div>
                 </div>
               ))}
