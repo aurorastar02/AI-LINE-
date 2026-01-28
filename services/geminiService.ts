@@ -23,20 +23,23 @@ const getAIClient = () => {
 };
 
 /**
- * 組合指令引擎：根據模式切換風格
+ * 組合指令引擎：根據模式切換風格，並加入解剖學防護
  */
 export const buildPrompt = (character: CharacterConfig, action: string, mode: GenerationMode = 'fine'): string => {
   const commonKeywords = "isolated on a solid pure GREEN background (RGB 0, 255, 0), chroma key style, no shadows, no text, 2d simple illustration.";
   
+  // 解剖學防護碼：強制約束肢體數量與結構
+  const anatomyGuard = "Ensure the character has normal anatomy: exactly two arms and two legs total, no extra fingers, no fused limbs, no duplicated body parts, anatomically correct structure.";
+
   let stylePrompt = "";
   if (mode === 'fine') {
     stylePrompt = "Sticker style, high quality, professional character design, clean sharp edges, thick black outlines, flat colors, cute and polished appearance.";
   } else {
-    // 使用使用者提供的「魔性崩壞」核心風格基礎
+    // 魔性模式：允許臉部扭曲但仍需限制肢體數量
     stylePrompt = "Sticker style, messy hand-drawn doodle, shaky brushstrokes, intentionally distorted facial features, asymmetric eyes, surreal humor, thick bold black outlines, solid WHITE border (5px).";
   }
 
-  return `A ${character.species}, ${character.features}, wearing ${character.clothing}, ${action}. The art style is ${character.style}. Visual properties: ${stylePrompt} ${commonKeywords}`;
+  return `A ${character.species}, ${character.features}, wearing ${character.clothing}, ${action}. The art style is ${character.style}. Visual properties: ${stylePrompt} ${anatomyGuard} ${commonKeywords}`;
 };
 
 export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
@@ -50,7 +53,7 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     contents.parts.unshift({
       inlineData: { data: base64Data, mimeType: 'image/png' }
     });
-    contents.parts.push({ text: "Maintain strict visual consistency with this character's identity while applying the specified art style. Ensure the background remains pure green (RGB 0,255,0)." });
+    contents.parts.push({ text: "Maintain strict visual consistency with this character's identity. Ensure the limb count (2 arms, 2 legs) remains identical to the reference. Background remains pure green (RGB 0,255,0)." });
   }
 
   try {
