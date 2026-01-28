@@ -26,13 +26,14 @@ const getAIClient = () => {
  * 組合指令引擎：根據模式切換風格
  */
 export const buildPrompt = (character: CharacterConfig, action: string, mode: GenerationMode = 'fine'): string => {
-  const commonKeywords = "Sticker style, isolated on a solid bright green background (RGB 0, 255, 0), chroma key style, no shadows on background, no text, 2d simple illustration.";
+  const commonKeywords = "isolated on a solid pure GREEN background (RGB 0, 255, 0), chroma key style, no shadows, no text, 2d simple illustration.";
   
   let stylePrompt = "";
   if (mode === 'fine') {
-    stylePrompt = "high quality, professional character design, clean sharp edges, thick black outlines, flat colors, perfect symmetry, cute and polished appearance.";
+    stylePrompt = "Sticker style, high quality, professional character design, clean sharp edges, thick black outlines, flat colors, cute and polished appearance.";
   } else {
-    stylePrompt = "ugly-cute style, intentionally messy doodles, shaky brushstrokes, distorted facial features, asymmetric eyes, weirdly proportioned body, surreal humor, crayon texture, rough marker lines, chaotic coloring, over-the-top exaggerated expressions, derpy face, low-brow art style.";
+    // 使用使用者提供的「魔性崩壞」核心風格基礎
+    stylePrompt = "Sticker style, messy hand-drawn doodle, shaky brushstrokes, intentionally distorted facial features, asymmetric eyes, surreal humor, thick bold black outlines, solid WHITE border (5px).";
   }
 
   return `A ${character.species}, ${character.features}, wearing ${character.clothing}, ${action}. The art style is ${character.style}. Visual properties: ${stylePrompt} ${commonKeywords}`;
@@ -65,7 +66,6 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     return `data:image/png;base64,${part.inlineData.data}`;
   } catch (error: any) {
     const errorMsg = error.message || "";
-    // 強化錯誤判定邏輯
     if (errorMsg.includes("API key not valid") || errorMsg.includes("401")) {
       throw new Error("API_KEY_INVALID");
     }

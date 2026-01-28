@@ -43,29 +43,65 @@ export const stickerScenarios = [
   "偷看 (Peeking from behind a corner)"
 ];
 
-// 魔性崩壞專用劇本 (實驗室、身體變形、抽象幽默)
+// 魔性崩壞專用劇本 (50組精選)
 export const abstractScenarios = [
-  // 實驗室日常與失敗
-  "炸了! (Shock): Holding a test tube that explodes violently with purple smoke. Face is hilariously distorted, eyes popping out cartoonishly.",
-  "怪東西 (Weird): Stirring a bubbling green sludge in a beaker. A weird alien tentacle emerges from the sludge. Looking disgusted and terrified.",
-  "焦了 (Burnt out): After an electric shock. Fur is standing straight up, covered in soot, smoke coming out of ears. Blank, stunned expression.",
-  "融化 (Melting): Literally melting into a puddle of orange goo on the lab floor, only eyes remain. Caption 'I'm done'.",
-  "卡住 (Stuck): Head stuck inside a large glass flask. Muffled, panicked expression.",
-  "嘿嘿 (Mad Scientist): Laughing maniacally while holding two glowing potions, glasses reflecting chaotic light. Drool coming out of mouth.",
-  "崩潰 (Frustrated): Scribbling furiously on a clipboard, then slamming it on the ground. Chalk dust everywhere.",
-  
-  // 抽象與身體變形
-  "昇華 (Soul leaving): Standing still while a translucent, ghostly version of itself floats out of its mouth.",
-  "位移 (Derpy): Face rearranged cubism style. One eye is on the cheek, mouth is on the forehead. Looking very confused.",
-  "拉長 (Stretched): Body is impossibly stretched out long like a noodle across the lab table.",
-  "幾何 (Geometric): Turned into a pile of abstract geometric shapes (cubes and spheres) with its original patterns.",
-  "爆載 (Overload): Top of the head opens up like a lid, smoke and gears pop out. Eyes swirling.",
-  "驚呆 (Jaw Drop): Jaw drops all the way to the floor, tongue rolls out like a red carpet. Eyes bulging enormously.",
-  
-  // 搞怪社交互動
-  "可以吧 (Doubtful OK): Giving an OK hand sign, but the hand is shaking uncontrollably, and sweat drops are flying.",
-  "閃亮登場 (Hi/Appearance): Emerging dramatically from a cloud of pink explosion smoke, waving awkwardly.",
-  "沒人 (Hiding/No): Only its butt and tail are sticking out from under a lab table. Trembling.",
-  "救命 (Help): Being chased by a giant mutated bouncy ball with teeth. Running desperately.",
-  "觀察中 (Staring): Looking through a giant magnifying glass, the eye is magnified 10 times larger, looking intensely weird."
+  // 一、 基礎社交篇
+  "哈囉 (Hello): Waving, but palm is larger than the head, eyes are at different heights.",
+  "謝謝 (Thank you): Bowing so low the head falls off and rolls on the floor, with an awkward but polite smile.",
+  "OK: Hand making an OK sign but has six fingers, body twisted into an S-shape.",
+  "不客氣 (You're welcome): Patting its chest, resulting in a large hollow hole in the torso.",
+  "讚 (Like): Thumb length is twice the body height, face overly squeezed with excitement.",
+  "掰掰 (Bye): Walking left but head turned 180 degrees to the right while waving.",
+  "早安 (Good Morning): Hair looking like fried chicken, eyes are tiny black dots, mouth on the edge of the cheek.",
+  "晚安 (Good Night): Lying on a cloud, but body melting down like liquid off the cloud's edge.",
+  "對不起 (Sorry): Crying so much tears turn into waterfalls, submerging half the body.",
+  "等我一下 (Wait): Legs running fast, but body frozen in place like a still photo.",
+
+  // 二、 情緒表達篇
+  "大笑 (LOL): Mouth open so wide it occupies the entire face, teeth jumping around like piano keys.",
+  "大哭 (Crying): Two powerful water jets from eyes blowing its own hat away.",
+  "生氣 (Angry): Top of head turning into an erupting volcano, face looking like a crumpled piece of paper.",
+  "驚訝 (Shock): Jaw dropping out of the frame, eyes popping out on springs.",
+  "疑惑 (What?): A giant question mark over head, neck curved and long like a giraffe.",
+  "委屈 (Pleading): Eyes turned into giant watery spheres, body shrunk into a tiny dot.",
+  "尷尬 (Awkward): Messy diagonal lines all over face, body becoming semi-transparent and half-faded.",
+  "無言 (Silent): Mouth zipped shut, facial features disappeared entirely, only the outline remains.",
+  "得意 (Smug): Nose grown long enough to touch the ceiling, a crooked wicked smile on the face.",
+  "心碎 (Broken): Body falling apart like puzzle pieces, a visible empty hole where the heart should be.",
+
+  // 三、 工作與忙碌篇
+  "忙碌中 (Busy): Growing eight hands to type on a keyboard, each hand a different length.",
+  "崩潰 (Mental Breakdown): Brain turning into a messy ball of yarn falling out, eyes turned into X shapes.",
+  "沒錢了 (Broke): Pockets turned out with two flies coming out, face flat like a piece of paper.",
+  "加油 (Fighting): Holding cheer sticks, but arm muscles unnaturally huge and asymmetrical.",
+  "想下班 (Want to go home): Body at the desk, soul already flying out the window.",
+  "已讀不回 (Ghosting): Turning into a semi-transparent shadow, slowly disappearing.",
+  "開會中 (Meeting): Head turned into a giant clock with hands spinning rapidly.",
+  "收到 (Copy that): Stiff like a robot, eyes glowing red but out of focus.",
+  "放假嘍 (Vacation): Body twisting softly like a noodle, with a foolish, vacant smile.",
+  "累癱 (Exhausted): Melted like a scoop of ice cream on a chair.",
+
+  // 四、 搞怪與胡說八道篇
+  "聽不見 (Can't hear): Ears larger than the head, but listening to sounds with its nose.",
+  "你在說什麼 (Nonsense): Pulling its own head off and observing it with its hands.",
+  "我想靜靜 (Need space): Rolling itself into a sushi roll, with only its feet sticking out.",
+  "閃亮登場 (Ta-da): Cheap star effects in background, pose extremely exaggerated with a sense of broken bones.",
+  "這太玄了 (Surreal): A black hole appearing in the middle of the body, sucking in nearby objects.",
+  "我的腦袋呢 (Lost mind): Looking for its own head on the floor with a magnifying glass.",
+  "別過來 (Stay away): Arms stretching out into crosswalk barrier gates, face distorted.",
+  "戀愛了 (In love): Eyes turned into two beating red hearts, heart jumping out of the body.",
+  "這很好吃 (Yummy): Tongue long enough to wrap around the neck, drooling everywhere.",
+  "我也要 (Me too): Squeezing into the frame from the edge, face squashed and deformed.",
+
+  // 五、 萬用日常反應篇
+  "等等見 (See ya): Using hands like helicopter propellers to fly away.",
+  "為什麼 (Why): Facial features shifted to the back, body folded 90 degrees.",
+  "超讚的 (Awesome): Whole body radiating gold light, but facial features simplified to three dots.",
+  "真的嗎 (Really?): One eyebrow raised to the ceiling, the other dropped to the chin.",
+  "我看看 (Let me see): Eyeballs detached from sockets, flying forward for close-up observation.",
+  "不要 (No): Head spinning so fast it becomes a blur with afterimages.",
+  "就是這樣 (Exactly): Giving a thumbs up, but the thumb is actually a small chicken.",
+  "好餓 (Hungry): Stomach turned into a giant mouth, roaring loudly.",
+  "受夠了 (Fed up): Turning into a giant angry rock with two tiny eyes.",
+  "我只是個路過的 (Just passing by): Walking sideways like a crab with weird body proportions."
 ];
