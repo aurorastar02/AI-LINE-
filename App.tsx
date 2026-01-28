@@ -102,12 +102,24 @@ export default function App() {
     // 隨機洗牌劇本庫
     const shuffledPool = pool.sort(() => Math.random() - 0.5);
     
-    const initialPrompts: StickerPrompt[] = shuffledPool.slice(0, stickerCount).map((action, index) => ({
-      id: `stk-${Date.now()}-${index}`,
-      keyword: action.split(' ')[0], 
-      visualDescription: buildPrompt(character, action, generationMode),
-      status: 'pending'
-    }));
+    const initialPrompts: StickerPrompt[] = shuffledPool.slice(0, stickerCount).map((action, index) => {
+      // 優化關鍵字提取：優先找 " ("，其次找 ":"
+      let keyword = action;
+      if (action.includes(' (')) {
+        keyword = action.split(' (')[0];
+      } else if (action.includes(':')) {
+        keyword = action.split(':')[0];
+      } else {
+        keyword = action.split(' ')[0];
+      }
+
+      return {
+        id: `stk-${Date.now()}-${index}`,
+        keyword: keyword, 
+        visualDescription: buildPrompt(character, action, generationMode),
+        status: 'pending'
+      };
+    });
     
     setPrompts(initialPrompts);
     setLineAssets({});
