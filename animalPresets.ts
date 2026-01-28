@@ -7,6 +7,99 @@ export interface CharacterPreset {
 }
 
 export const animalDatabase: CharacterPreset[] = [
+  // --- 新增 15 種貓咪品種 ---
+  {
+    id: 'siamese_cat',
+    species: '暹羅貓 (Siamese)',
+    features: '經典的重點色（臉、耳、腳、尾發黑），身體奶油色，配上深藍色大眼。Siamese kitten, cream body with dark chocolate points on face/ears/paws/tail, striking deep blue eyes.',
+    clothing: '繫著一條帶有金色小鈴鐺的紅色絲絨項圈。',
+  },
+  {
+    id: 'persian_cat',
+    species: '波斯貓 (Persian)',
+    features: '全身超級蓬鬆像朵雲，臉部扁平（像被平底鍋拍過），有著奢華的大尾巴。Fluffy Persian kitten, cloud-like long white fur, squished flat pug-like face, luxurious bushy tail.',
+    clothing: '頭上戴著一頂鑲有粉色珍珠的迷你小皇冠。',
+  },
+  {
+    id: 'scottish_fold',
+    species: '蘇格蘭折耳貓 (Scottish Fold)',
+    features: '耳朵緊緊向前折疊貼著頭皮，臉型超級圓潤，像貓頭鷹一樣可愛。Scottish Fold kitten, ears folded tightly forward against head, extremely round face, owl-like appearance.',
+    clothing: '穿著一件鮮黃色的針織小背心。',
+  },
+  {
+    id: 'tuxedo_cat',
+    species: '賓士貓 (Tuxedo)',
+    features: '像穿著黑色西裝外套配白色襯衫，臉部有白色倒 V 字面罩，白手套腳掌。Tuxedo kitten, black fur "suit" with white chest and paws, distinct white inverted V mark on face.',
+    clothing: '戴著一個正式的黑色紳士小領結。',
+  },
+  {
+    id: 'russian_blue',
+    species: '俄羅斯藍貓 (Russian Blue)',
+    features: '全身閃著銀光的藍灰色短毛，配上像寶石一樣的翠綠色眼睛，體態優雅。Russian Blue kitten, sleek shimmering silver-grey short fur, vivid emerald green eyes, elegant posture.',
+    clothing: '繫著一條優雅的銀藍色絲綢圍巾。',
+  },
+  {
+    id: 'munchkin_cat',
+    species: '曼赤肯短腿貓 (Munchkin)',
+    features: '貓界的柯基！腿超級短，身體顯得特別長，走路搖搖晃晃很呆萌。Munchkin kitten, extremely short stubby legs, long body low to ground, waddling cute pose.',
+    clothing: '穿著一對帶有小翅膀的粉藍色胸背帶。',
+  },
+  {
+    id: 'bengal_cat',
+    species: '孟加拉豹貓 (Bengal)',
+    features: '身上有像小豹一樣的金色底黑色玫瑰斑紋，充滿野性美但表情可愛。Bengal kitten, golden fur with distinct black leopard rosette spots, wild pattern but cute face.',
+    clothing: '戴著一副帥氣的迷你飛行員飛行眼鏡。',
+  },
+  {
+    id: 'ragdoll_cat',
+    species: '布偶貓 (Ragdoll)',
+    features: '比暹羅更蓬鬆的重點色長毛，體型較大，給人一種軟綿綿、想被人抱著的感覺。Fluffy Ragdoll kitten, seal point coloration with long soft fur, large blue eyes, relaxed floppy pose.',
+    clothing: '圍著一圈蕾絲邊的白色女僕風圍兜。',
+  },
+  {
+    id: 'british_shorthair',
+    species: '英國短毛貓 (British Shorthair)',
+    features: '臉頰肉肉的像個大包子，毛髮濃密呈現經典的藍灰色，身體圓滾滾。Chubby British Shorthair kitten, dense blue-grey fur, very round cheeks ("包子臉"), solid rounded body.',
+    clothing: '戴著一頂紅色的英式衛兵毛絨帽。',
+  },
+  {
+    id: 'sphynx_cat',
+    species: '無毛貓 (Sphynx)',
+    features: '全身無毛充滿皺褶（醜萌感），皮膚是粉紅色，有著巨大的蝙蝠耳朵。Hairless Sphynx kitten, wrinkly pink skin texture, oversized bat-like ears, ugly-cute expression.',
+    clothing: '穿著一件色彩斑斕的嬉皮風紮染 T 恤。',
+  },
+  {
+    id: 'maine_coon',
+    species: '緬因貓 (Maine Coon)',
+    features: '耳朵尖端有像猞猁一樣的聰明毛，體型巨大蓬鬆，尾巴像雞毛撢子。Fluffy Maine Coon kitten, large ears with distinct lynx-tip tufts, oversized bushy raccoon-like tail.',
+    clothing: '戴著一條鑲有寶石的厚重皮草圍脖。',
+  },
+  {
+    id: 'tortoiseshell_cat',
+    species: '玳瑁貓 (Tortoiseshell)',
+    features: '黑色與橘色不規則混雜的毛色（像雜亂的調色盤），通常很有個性。Tortoiseshell kitten, mottled patches of black and orange fur randomly mixed, unique patterned face.',
+    clothing: '戴著一個紫色的小巫師帽。',
+  },
+  {
+    id: 'american_curl',
+    species: '美國捲耳貓 (American Curl)',
+    features: '耳朵向後腦勺彎曲成一個可愛的弧度，看起來總是在驚訝地聽聲音。American Curl kitten, ears curled backward in a distinct arc like strange horns, curious look.',
+    clothing: '掛著一副造型誇張的黃色大耳機。',
+  },
+  {
+    id: 'odd_eyed_white',
+    species: '異色瞳白貓 (Odd-eyed White)',
+    features: '全身純白無雜質，一隻眼睛是藍色，另一隻是金色或綠色，非常夢幻。Pure white kitten, heterochromia eyes (one blue eye, one gold eye), magical cute look.',
+    clothing: '背後背著一對半透明的小天使羽翼。',
+  },
+  {
+    id: 'abyssinian_cat',
+    species: '阿比西尼亞貓 (Abyssinian)',
+    features: '毛色像小美洲獅一樣的紅褐色（漸層色），耳朵大而尖，身形修長。Abyssinian kitten, ruddy ticked coat (reddish-brown gradient), large alert ears, slender puma-like body.',
+    clothing: '戴著一個帶有神祕圖騰的金色法老頭飾。',
+  },
+
+  // --- 原有的動物資料庫 ---
   {
     id: 'capybara',
     species: '佛系水豚 (Capybara)',
@@ -137,7 +230,7 @@ export const animalDatabase: CharacterPreset[] = [
     id: 'squirrel_nut',
     species: '吃貨小松鼠 (Squirrel)',
     features: '巨大的咖啡色蓬鬆尾巴，臉頰因為塞滿食物而鼓成兩大顆圓球。',
-    clothing: '背著一個迷你的編織松果背包。',
+    clothing: '背著一個迷年的編織松果背包。',
   },
 ];
 

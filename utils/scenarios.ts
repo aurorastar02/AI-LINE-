@@ -1,4 +1,3 @@
-
 // 經典日常劇本 (適合精緻模式)
 export const stickerScenarios = [
   "嗨嗨 (Waving hello)",
@@ -8,7 +7,7 @@ export const stickerScenarios = [
   "嗚嗚 (Crying loudly)",
   "亨! (Pouting and angry)",
   "衝啊 (Typing furiously on laptop)",
-  "+1 (Holding a +1 sign)",
+  "+1 (Standing with a large, stylish '+1' symbol floating next to the character)",
   "收到 (Giving a salute)",
   "晚安 (Sleeping with a pillow)",
   "早安 (Stretching with sun background)",
@@ -37,8 +36,6 @@ export const stickerScenarios = [
   "母湯 (Shaking head vigorously)",
   "撒花 (Throwing flower petals)",
   "熱血 (Pumping fist in the air)",
-  "亮! (Glowing in the dark)",
-  "優雅 (Sipping coffee elegantly)",
   "跪求 (Prostrating in formal apology)",
   "偷看 (Peeking from behind a corner)"
 ];
