@@ -133,7 +133,10 @@ export default function App() {
       if (!target) return null;
 
       const raw = await generateStickerImage(target.visualDescription, character.referenceImage);
-      const processed = await processSticker(raw, target.keyword, selectedTextStyle);
+      
+      // 特殊處理：針對 "+1" 貼圖取消文字疊加，因為圖片內已有生成的符號
+      const overlayText = target.keyword === "+1" ? undefined : target.keyword;
+      const processed = await processSticker(raw, overlayText, selectedTextStyle);
       
       if (processed) {
         const updatedPrompt = { 
