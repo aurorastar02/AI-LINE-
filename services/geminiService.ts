@@ -4,7 +4,6 @@ import { CharacterConfig, GenerationMode } from "../types";
 
 /**
  * 動態獲取 API Key
- * 優先序：localStorage (非空) > process.env.API_KEY
  */
 export const getActiveApiKey = () => {
   const manualKey = localStorage.getItem('user_gemini_api_key');
@@ -14,32 +13,38 @@ export const getActiveApiKey = () => {
   return { key: process.env.API_KEY || '', source: 'system' as const };
 };
 
-/**
- * 內部使用的初始化方法，確保每次呼叫都是最新的 Key
- */
 const getAIClient = () => {
   const { key } = getActiveApiKey();
   return new GoogleGenAI({ apiKey: key });
 };
 
 /**
- * 組合指令引擎：根據模式切換風格，並加入解剖學防護
+ * 組合指令引擎：整合 Global Anatomy Guard 與防止多手咒語
  */
 export const buildPrompt = (character: CharacterConfig, action: string, mode: GenerationMode = 'fine'): string => {
-  const commonKeywords = "isolated on a solid pure GREEN background (RGB 0, 255, 0), chroma key style, no shadows, no text, 2d simple illustration.";
+  // 球通用：肢體防護基礎權重 (Global Anatomy Guard)
+  const anatomyGuard = "strictly two arms and two legs, exactly two paws visible, anatomically correct limbs, no extra hands, single character, thick white border, solid green background (RGB 0, 255, 0).";
+
+  // 針對特定動作的肢體校正咒語 (Ultimate Spell)
+  let actionModifier = action;
+  const lowercaseAction = action.toLowerCase();
   
-  // 解剖學防護碼：強制約束肢體數量與結構
-  const anatomyGuard = "Ensure the character has normal anatomy: exactly two arms and two legs total, no extra fingers, no fused limbs, no duplicated body parts, anatomically correct structure.";
+  if (lowercaseAction.includes("hands") || lowercaseAction.includes("holding")) {
+    // 當需要雙手持物時，強制改為「雙手持牌」概念以穩定數量
+    actionModifier += ", holding a sign with both hands to ensure limb count.";
+  } else if (lowercaseAction.includes("waving") || lowercaseAction.includes("thumbs up") || lowercaseAction.includes("salute")) {
+    // 當需要單手動作時，強制另一手在背後或垂下
+    actionModifier += ", with one hand performing the action and the other hand strictly behind back or at side.";
+  }
 
   let stylePrompt = "";
   if (mode === 'fine') {
-    stylePrompt = "Sticker style, high quality, professional character design, clean sharp edges, thick black outlines, flat colors, cute and polished appearance.";
+    stylePrompt = "Professional sticker design, high quality, clean sharp edges, thick black outlines, flat colors, cute chibi proportions.";
   } else {
-    // 魔性模式：允許臉部扭曲但仍需限制肢體數量
-    stylePrompt = "Sticker style, messy hand-drawn doodle, shaky brushstrokes, intentionally distorted facial features, asymmetric eyes, surreal humor, thick bold black outlines, solid WHITE border (5px).";
+    stylePrompt = "Messy hand-drawn doodle, shaky brushstrokes, distorted funny facial features, surreal humor, bold black outlines.";
   }
 
-  return `A ${character.species}, ${character.features}, wearing ${character.clothing}, ${action}. The art style is ${character.style}. Visual properties: ${stylePrompt} ${anatomyGuard} ${commonKeywords}`;
+  return `A ${character.species}, ${character.features}, wearing ${character.clothing}. ${actionModifier}. Style: ${character.style}. ${stylePrompt} ${anatomyGuard}`;
 };
 
 export const generateStickerImage = async (prompt: string, referenceImage?: string): Promise<string> => {
@@ -53,7 +58,7 @@ export const generateStickerImage = async (prompt: string, referenceImage?: stri
     contents.parts.unshift({
       inlineData: { data: base64Data, mimeType: 'image/png' }
     });
-    contents.parts.push({ text: "Maintain strict visual consistency with this character's identity. Ensure the limb count (2 arms, 2 legs) remains identical to the reference. Background remains pure green (RGB 0,255,0)." });
+    contents.parts.push({ text: "Maintain strict visual consistency with this reference character. Keep same species, colors, and limb count (strictly 2 arms, 2 legs)." });
   }
 
   try {

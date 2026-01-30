@@ -3,7 +3,7 @@
 export const stickerScenarios = [
   "嗨嗨 (Waving hello with one hand clearly raised, the other arm resting at side, exactly two arms total, normal fingers)",
   "謝啦 (Bowing politely with both hands placed neatly at sides, clear and fixed limb structure)",
-  "讚喔 (Lifting the RIGHT hand in a clear, bold thumbs-up gesture, LEFT arm resting clearly at the side. Strictly two arms and ten fingers in total, no extra limbs.)",
+  "讚喔 (Lifting the RIGHT hand in a clear, bold thumbs-up gesture, LEFT arm resting clearly at the side. Strictly only two arms and ten fingers in total, no extra limbs.)",
   "哈哈哈 (Laughing joyfully with both hands holding its belly, symmetric arm placement)",
   "嗚嗚 (Crying loudly. Exactly two hands are closed into fists and placed near the eyes. Strictly only two arms total, no extra fingers or limbs.)",
   "亨! (Crossing exactly two arms tightly over the chest in a pouting angry pose. Strictly only two arms and ten fingers in total. No extra limbs or hands appearing from the back.)",
@@ -38,9 +38,8 @@ export const stickerScenarios = [
   "偷看 (Peeking from behind a wall, only one eye and one hand visible, clear body structure)"
 ];
 
-// 魔性崩壞專用劇本 (同樣強化肢體數量約束)
+// 魔性崩壞專用劇本 (維持不變)
 export const abstractScenarios = [
-  // 💼 職場生存篇
   "收到 (Copy): Standing stiff like a robot, giving a salute with one hand that is twice as big as the head, only two arms total.",
   "安排 (Plan): Drawing chaotic lines in the air with one hand, other hand on hip, strictly two arms.",
   "在路上 (Coming): Running posture but the two legs are transformed into bicycle wheels.",
@@ -56,68 +55,27 @@ export const abstractScenarios = [
   "沒錢了 (Broke): Two hands pulling out empty pockets, crying soap bubbles.",
   "這很不專業 (Unpro): Wearing a suit, head is a clown nose, two arms crossed.",
   "明天再說 (Later): Pushing a giant rock with two hands, lazy expression.",
-  "確認過眼神 (Eyes): One eye a camera, other a heart, two hands holding a magnifying glass.",
   "救命 (Help): Inside an hourglass, two hands pressing against the glass.",
   "加班中 (OT): Eyes glowing red, two hands typing so fast they are a blur.",
   "薪水小偷 (Thief): Sneaky raccoon look, two hands holding a sack.",
-  "正在開機 (Booting): Wind-up key in back, two arms in a stiff T-pose.",
   "好的 (Fine): Wide smile, two hands giving two thumbs up, strictly two arms.",
-  "報告難產 (Stuck): Trying to lay a USB egg, two hands holding the chair.",
-  "請指示 (Order): Saluting a rubber duck with one hand, other arm at side.",
   "我太難了 (Hard): Squashed flat by a brick, two arms and two legs poking out from sides.",
   "又是星期一 (Mon): Melted into goo, two hands barely visible on the armrests.",
-
-  // 🎓 校園日常篇
-  "學分... (Credit): Chasing flying coins with two arms extended forward.",
-  "會過嗎？ (Pass?): Balancing on a rope with two arms spread for balance.",
-  "求歐趴 (All Pass): Worshipping a statue with two hands raised, symmetric pose.",
-  "圖書館見 (Lib): Buried under books, one hand holding a highlighter poking out.",
-  "沒睡飽 (Sleepy): Holding a pillow with two arms, eyes sagging.",
-  "報告地獄 (Hell): Surrounded by demons, two hands protecting the head.",
-  "腦容量不足 (Full): Head ballooning, two hands holding the large head.",
-  "想下課 (Go): Body stretching toward door, two hands reaching forward.",
-  "誰有點名？ (Roll): Hiding in a trash can, two hands holding the lid.",
-  "分組求饒 (Team): Character splitting into three, each with two arms and two legs.",
-  "老師別看我 (Shy): Turning transparent, two hands covering the face.",
-  "又要重考 (Fail): Sitting in rain, two hands holding a '0' paper.",
-  "正在吸收 (Study): Head is a literal sponge, someone is pouring a bucket of 'KNOWLEDGE' on it.",
-  "放棄思考 (Stop): Brain replaced by a small, rotating hamster wheel with a tiny hamster inside.",
-  "土地法難唸 (Law): Trying to eat a giant, dry book, teeth are crumbling into dust.",
-  "PPT 沒靈感 (PPT): Staring at a screen that shows only a black hole sucking in the character.",
-  "這題我會 (I know): Head glowing like a bright lightbulb, one hand raised high, other at side.",
-  "才怪 (Psyche): Character has a second face on the back of its head that is sticking its tongue out.",
-  "衝一波 (Go): Riding on top of a giant pencil like it's a rocket ship.",
-  "教授饒命 (Mercy): Prostrating on the floor, while the floor is turning into a swamp.",
-  "沒筆記 (None): Holding a pen that has turned into a wilted flower, staring at a blank notebook.",
-  "考試爆炸 (Boom): Head is literally exploding into colorful confetti and math formulas.",
-  "活著真累 (Tired): Dragging a giant, heavy stone shaped like a sleeping face.",
-  "需要能量 (Power): Character plugged into a wall outlet, eyes glowing yellow.",
-  "睡魔攻擊 (Attack): A giant, fluffy purple monster is hugging the character tightly.",
-
-  // 🌈 社交與生活篇
   "蛤？ (What): Abstract face, two hands palms up in confusion.",
   "哈哈 (Haha): Giant mouth, two hands slapping knees in laughter.",
-  "真的 (Real): Using a magnifying glass with one hand, other hand on hip.",
-  "走起 (Let's go): Body is a skateboard, the character's head is the driver.",
   "吃什麼？ (Food): Head turning into a rotating menu of pizza, sushi, and noodles.",
   "不想動 (Lazy): Character has grown roots into the sofa, turning into a potato.",
-  "懶 (Laze): Melted like a scoop of ice cream on the floor.",
   "先不要 (No): Both hands creating a giant 'X' shield made of energy.",
   "被閃瞎 (Blind): Wearing three pairs of sunglasses, looking at a bright glowing heart.",
-  "求帶飛 (Carry): Grabbing onto the leg of a giant flying bird with a hopeful face.",
   "我就廢 (Trash): Sitting inside a literal trash bag with a crown on the head.",
   "笑死 (Lol): Character is lying on the ground, literally broken into several smiling pieces.",
   "真香 (Good): Smelling a floating fried chicken, nose has grown 10 inches long.",
   "傻眼 (Dumb): Eyes replaced by two white marble balls, jaw dropped to the floor.",
   "已羨慕 (Envy): Face turning green, eyes turning into green dollar signs or hearts.",
-  "邊緣人 (Alone): Sitting in a dark circle while everyone else is in a bright party background.",
   "是在哈囉？ (Hello): One hand waving, while the face is a confused abstract painting.",
-  "保持微笑 (Smile): Face is a static emoji mask, while the body behind it is crying.",
   "我選宅 (Stay): Wrapping self in a giant blanket cocoon, only eyes visible.",
   "錢錢再見 (Money): Wallet has grown wings and is flying into a dark vortex.",
   "美食召喚 (Hungry): Floating toward a giant hamburger like a zombie.",
-  "正在耍廢 (Idle): Character juggling three pillows while lying down.",
   "沒救了 (Done): Character is a cracked vase being glued back together with honey.",
-  "讚啦 (Great): Two thumbs up, but the thumbs are actually small smiley faces.",
-  "先去洗澡 (Bath): Running away so fast it leaves a trail of soap bubbles and rubber ducks."
+  "讚啦 (Great): Two thumbs up, but the thumbs are actually small smiley faces."
 ];
